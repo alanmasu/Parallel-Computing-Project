@@ -1,5 +1,9 @@
 #ifndef MATMUL_H
 #define MATMUL_H
+
+#include <cuda_runtime.h>
+#include <cublas_v2.h>
+
 /*! 
     @brief      Function to perform matrix multiplication of two matrices A and B
 
@@ -28,6 +32,9 @@ void serialBatchedMatMul(const float *A, const float *B, float *C, int N, int bl
 */
 void serialMatMul(const float *A, const float *B, float *C, int N);
 
+
+void checkCudaError(cudaError_t err, const char *msg);
+void checkCublasError(cublasStatus_t status, const char *msg);
 
 /*! 
     @brief      Function to perform matrix multiplication of two matrices A and B using cuBLAS
