@@ -45,6 +45,9 @@ void serialMatMul(const float *A, const float *B, float *C, int N);
 void cublasMatMul(const float *d_A, const float *d_B, float *d_C, int N, float* milliseconds, double* TFLOPS);
 
 
-
+/*!
+    @brief      Function to perform batched matrix multiplication of two matrices A and B using CUDA tensor cores
+*/
+void tensorCoreMatMul(const float *d_A, const float *d_B, float *d_C, int N, int blockSize, float* milliseconds, double* TFLOPS);
 
 #endif // MATMUL_H

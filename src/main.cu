@@ -75,7 +75,7 @@ int main() {
 
     /////// Custom Kernel ///////
     // Moltiplicazione di matrici con kernel custom
-    //tensorCoreMatMul(d_A, d_B, d_C, N, &myMillis, &myTFLOPS);
+    //tensorCoreMatMul(d_A, d_B, d_C, N, blockSize, &myMillis, &myTFLOPS);
 
     // Libera la memoria sull'host
     free(h_A);
