@@ -44,12 +44,12 @@ sbatch scripts/scheduler.sh
 ```
 
 ### Clean
-To clean the project you can use the following command:
+To clean the scheduler output you can use the following command:
 ```bash
 make clean
 ```
 
-If you want to remove also the scheduler outputs you can use the following command:
+If you want to remove also the object files you can use the following command:
 ```bash
 make cleanall
 ```

@@ -47,11 +47,12 @@ $(BIN_DIR)/$(TARGET): $(OBJS)
 
 # Pulizia dei file generati
 clean:
-	rm -rf $(OBJ_DIR) $(BIN_DIR)
+	rm -rf $(OUTPUT_DIR) 
+	mkdir -p $(OUTPUT_DIR)
 
 # Pulizia più approfondita
 cleanall: clean
-	rm -rf $(BIN_DIR) $(OBJ_DIR) $(OUTPUT_DIR) 
+	rm -rf $(BIN_DIR) $(OBJ_DIR)
 
 
 
