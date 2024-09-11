@@ -22,9 +22,7 @@ INCLUDE_FLAGS = $(addprefix -I, $(INCLUDE_DIRS))
 NVCC = nvcc
 NVCC_FLAGS = -O3 $(INCLUDE_FLAGS) -lcublas
 
-# Regola di default
-all: $(BIN_DIR) $(OBJ_DIR) $(BIN_DIR)/$(TARGET)
-
+main: all
 
 # Crea le directory bin e obj se non esistono
 $(BIN_DIR):
@@ -32,6 +30,9 @@ $(BIN_DIR):
 
 $(OBJ_DIR):
 	mkdir -p $(OBJ_DIR)
+
+# Regola di default
+all: $(BIN_DIR) $(OBJ_DIR) $(BIN_DIR)/$(TARGET)
 
 # Compilazione dei file oggetto dalla directory src
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cu
@@ -53,6 +54,3 @@ clean:
 # Pulizia più approfondita
 cleanall: clean
 	rm -rf $(BIN_DIR) $(OBJ_DIR)
-
-
-
