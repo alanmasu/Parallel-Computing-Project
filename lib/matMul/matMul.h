@@ -35,13 +35,16 @@ void serialMatMul(const float *A, const float *B, float *C, int N);
     @details    Performing a matrix multiplication of two matrices A and B and storing the result in matrix C. 
                 The matrices are of size N x N.
 
-    @param      A[in] Pointer to the first matrix in ROW MAJOR format, the matrix is allocated in host memory
-    @param      B[in] Pointer to the second matrix in ROW MAJOR format, the matrix is allocated in host memory
-    @param      C[out] Pointer to the resultant matrix in ROW MAJOR format, the matrix is allocated in host memory
+    @param      A[in] Pointer to the first matrix in ROW MAJOR format, the matrix is allocated in device memory
+    @param      B[in] Pointer to the second matrix in ROW MAJOR format, the matrix is allocated in device memory
+    @param      C[out] Pointer to the resultant matrix in ROW MAJOR format, the matrix is allocated in device memory
     @param      N[in] Size of the row/column of the matrices
     @param      milliseconds[out] Time taken to perform the matrix multiplication
     @param      TFLOPS[out] Theoretical peak FLOPS achieved during the matrix multiplication
 */
-void cublasMatMul(const float *h_A, const float *h_B, float *h_C, int N, float* milliseconds, double* TFLOPS);
+void cublasMatMul(const float *d_A, const float *d_B, float *d_C, int N, float* milliseconds, double* TFLOPS);
+
+
+
 
 #endif // MATMUL_H

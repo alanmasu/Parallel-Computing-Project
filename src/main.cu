@@ -36,13 +36,29 @@ int main() {
         h_B[i] = i;
     }
 
-    //Indicatori di performance
-    float milliseconds = 0;
-    double TFLOPS = 0;
+    //Device allocation
+    float *d_A, *d_B, *d_C;
+    checkCudaError(cudaMalloc((void **)&d_A, matrix_size), "Allocazione matrice A su GPU");
+    checkCudaError(cudaMalloc((void **)&d_B, matrix_size), "Allocazione matrice B su GPU");
+    checkCudaError(cudaMalloc((void **)&d_C, matrix_size), "Allocazione matrice C su GPU");
 
+    // Copia delle matrici dall'host alla GPU
+    checkCudaError(cudaMemcpy(d_A, h_A, matrix_size, cudaMemcpyHostToDevice), "Copia matrice A sulla GPU");
+    checkCudaError(cudaMemcpy(d_B, h_B, matrix_size, cudaMemcpyHostToDevice), "Copia matrice B sulla GPU");
+
+    //Indicatori di performance
+    float cublasMillis = 0;
+    double cublasTFLOPS = 0;
+
+    float myMillis = 0;
+    double myTFLOPS = 0;
+
+    ///////////////////// ALGORHITMs ///////////////////////
+    /////// cuBLAS ///////
     // Moltiplicazione di matrici con cuBLAS
-    cublasMatMul(h_A, h_B, h_C, N, &milliseconds, &TFLOPS); 
-    
+    cublasMatMul(d_A, d_B, d_C, N, &cublasMillis, &cublasTFLOPS); 
+    // Copia dei risultati dalla GPU all'host
+    checkCudaError(cudaMemcpy(h_C, d_C, matrix_size, cudaMemcpyDeviceToHost), "Copia matrice C dall'host");
     //Stampa delle matrici
     if(N <= 3){
         printf("Matrice A:\n");
@@ -54,13 +70,22 @@ int main() {
     }
 
     // Stampa dei risultati
-    printf("\n\nTempo di esecuzione: %f ms\n", milliseconds);
-    printf("TFLOPS: %f\n", TFLOPS);
+    printf("\n\nTempo di esecuzione [cuBLAS]: %f ms\n", milliseconds);
+    printf("TFLOPS [cuBLAS]: %f\n", TFLOPS);
+
+    /////// Custom Kernel ///////
+    // Moltiplicazione di matrici con kernel custom
+    //tensorCoreMatMul(d_A, d_B, d_C, N, &myMillis, &myTFLOPS);
 
     // Libera la memoria sull'host
     free(h_A);
     free(h_B);
     free(h_C);
+
+    // Libera la memoria sulla GPU
+    cudaFree(d_A);
+    cudaFree(d_B);
+    cudaFree(d_C);
 
     return 0;
 }

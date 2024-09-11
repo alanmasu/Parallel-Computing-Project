@@ -38,24 +38,13 @@ void checkCublasError(cublasStatus_t status, const char *msg) {
     }
 }
 
-void cublasMatMul(const float *h_A, const float *h_B, float *h_C, int N, float* milliseconds, double* TFLOPS){
-    // Punteri per le matrici sulla GPU (device)
-    float *d_A, *d_B, *d_C;
-    float alpha = 1.0f, beta = 0.0f;
+void cublasMatMul(const float *d_A, const float *d_B, float *d_C, int N, float* milliseconds, double* TFLOPS){
 
-    // Allocazione delle matrici sulla GPU (device)
-    size_t matrix_size = N * N * sizeof(float);
-    checkCudaError(cudaMalloc((void **)&d_A, matrix_size), "Allocazione matrice A su GPU");
-    checkCudaError(cudaMalloc((void **)&d_B, matrix_size), "Allocazione matrice B su GPU");
-    checkCudaError(cudaMalloc((void **)&d_C, matrix_size), "Allocazione matrice C su GPU");
+    float alpha = 1.0f, beta = 0.0f;
 
     // Inizializzazione dell'handle cuBLAS
     cublasHandle_t handle;
     checkCublasError(cublasCreate(&handle), "Inizializzazione cuBLAS");
-
-    // Copia delle matrici dall'host alla GPU
-    checkCudaError(cudaMemcpy(d_A, h_A, matrix_size, cudaMemcpyHostToDevice), "Copia matrice A sulla GPU");
-    checkCudaError(cudaMemcpy(d_B, h_B, matrix_size, cudaMemcpyHostToDevice), "Copia matrice B sulla GPU");
 
     // Misurazione del tempo
     cudaEvent_t start, stop;
@@ -80,9 +69,7 @@ void cublasMatMul(const float *h_A, const float *h_B, float *h_C, int N, float* 
         *milliseconds = 0;
         cudaEventElapsedTime(milliseconds, start, stop);
     }
-    // Copia dei risultati dalla GPU all'host
-    checkCudaError(cudaMemcpy(h_C, d_C, matrix_size, cudaMemcpyDeviceToHost), "Copia matrice C dall'host");
-
+    
     // Numero totale di operazioni in virgola mobile (FLOP)
     double FLOPs = 2.0 * N * N * N;
 
@@ -92,11 +79,6 @@ void cublasMatMul(const float *h_A, const float *h_B, float *h_C, int N, float* 
     }else{
         printf("some pointers are NULL\n");
     }
-
-    // Libera la memoria sulla GPU
-    cudaFree(d_A);
-    cudaFree(d_B);
-    cudaFree(d_C);
 
     // Distruggi l'handle cuBLAS
     cublasDestroy(handle);
