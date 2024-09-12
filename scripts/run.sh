@@ -8,5 +8,12 @@
 #SBATCH --job-name=test-project
 #SBATCH --output=run/test-project-%j.out
 #SBATCH --error=run/test-project-%j.err
+
+#SBATCH --mail-user=alan.masutti@studenti.unitn.it
+#SBATCH --mail-type=ALL
+
 module load cuda/12.1
-srun /home/alan.masutti/Project/build/bin/main
+cd /home/alan.masutti/Project
+git checkout testingFeature
+make
+srun /home/alan.masutti/Project/build/bin/main "Testing results saver feature"

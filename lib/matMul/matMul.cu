@@ -25,61 +25,68 @@ void serialMatMul(const float *A, const float *B, float *C, int N){
 // Funzione helper per il controllo degli errori CUDA
 void checkCudaError(cudaError_t err, const char *msg) {
     if (err != cudaSuccess) {
-        fprintf(stderr, "CUDA error: %s: %s\n", msg, cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
+        printf("CUDA error: %s: %s\n", msg, cudaGetErrorString(err));
+        //exit(EXIT_FAILURE);
     }
 }
 
 // Funzione helper per il controllo degli errori cuBLAS
 void checkCublasError(cublasStatus_t status, const char *msg) {
     if (status != CUBLAS_STATUS_SUCCESS) {
-        fprintf(stderr, "cuBLAS error: %s\n", msg);
-        exit(EXIT_FAILURE);
+        printf("cuBLAS error: %s\n", msg);
+        //exit(EXIT_FAILURE);
     }
 }
 
 void cublasMatMul(const float *d_A, const float *d_B, float *d_C, int N, float* milliseconds, double* TFLOPS){
+    if(d_A != NULL && d_B != NULL && d_C != NULL){
+        float alpha = 1.0f, beta = 0.0f;
 
-    float alpha = 1.0f, beta = 0.0f;
+        // Inizializzazione dell'handle cuBLAS
+        cublasHandle_t handle;
+        checkCublasError(cublasCreate(&handle), "Inizializzazione cuBLAS");
 
-    // Inizializzazione dell'handle cuBLAS
-    cublasHandle_t handle;
-    checkCublasError(cublasCreate(&handle), "Inizializzazione cuBLAS");
+        // Misurazione del tempo
+        cudaEvent_t start, stop;
+        cudaEventCreate(&start);
+        cudaEventCreate(&stop);
 
-    // Misurazione del tempo
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
+        // Avvia il timer
+        cudaEventRecord(start, 0);
 
-    // Avvia il timer
-    cudaEventRecord(start, 0);
+        // Esegui la moltiplicazione di matrici (C = alpha * A * B + beta * C) sulla GPU
+        checkCublasError(
+            cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, N, N, N, &alpha, d_A, N, d_B, N, &beta, d_C, N),
+            "Moltiplicazione di matrici"
+        );
 
-    // Esegui la moltiplicazione di matrici (C = alpha * A * B + beta * C) sulla GPU
-    checkCublasError(
-        cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, N, N, N, &alpha, d_A, N, d_B, N, &beta, d_C, N),
-        "Moltiplicazione di matrici"
-    );
+        // Ferma il timer
+        cudaEventRecord(stop, 0);
+        cudaEventSynchronize(stop);
 
-    // Ferma il timer
-    cudaEventRecord(stop, 0);
-    cudaEventSynchronize(stop);
+        // Calcola il tempo impiegato
+        if(milliseconds != NULL){
+            *milliseconds = 0;
+            cudaEventElapsedTime(milliseconds, start, stop);
+        }
+        
+        // Numero totale di operazioni in virgola mobile (FLOP)
+        double FLOPs = 2.0 * N * N * N;
 
-    // Calcola il tempo impiegato
-    if(milliseconds != NULL){
-        *milliseconds = 0;
-        cudaEventElapsedTime(milliseconds, start, stop);
-    }
-    
-    // Numero totale di operazioni in virgola mobile (FLOP)
-    double FLOPs = 2.0 * N * N * N;
+        // Calcolo dei TFLOPS
+        if(milliseconds != NULL && TFLOPS != NULL){
+            *TFLOPS = (FLOPs / (*milliseconds / 1000.0)) / 1e12;
+        }else{
+            printf("some pointers are NULL\n");
+        }
 
-    // Calcolo dei TFLOPS
-    if(milliseconds != NULL && TFLOPS != NULL){
-        *TFLOPS = (FLOPs / (*milliseconds / 1000.0)) / 1e12;
+        // Distruggi l'handle cuBLAS
+        cublasDestroy(handle);
     }else{
-        printf("some pointers are NULL\n");
+        printf("unable to perform MatMul caused by NULL pointers\n");
+        if(milliseconds != NULL && TFLOPS != NULL){
+            *milliseconds = -1;
+            *TFLOPS = -1;
+        }
     }
-
-    // Distruggi l'handle cuBLAS
-    cublasDestroy(handle);
 }
