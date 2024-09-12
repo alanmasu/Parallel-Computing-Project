@@ -35,7 +35,7 @@ int main(int argc, char **argv) {
     if(descriptionFile != NULL){
         fprintf(descriptionFile, "File di descrizione della run:\n");
         if(argc >= 1){
-            fprintf(descriptionFile, "%s\n", argv[0]);
+            fprintf(descriptionFile, "%s\n", argv[1]);
         }
         fclose(descriptionFile);
     }else{
