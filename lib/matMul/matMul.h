@@ -33,7 +33,7 @@ void serialBatchedMatMul(const float *A, const float *B, float *C, int N, int bl
 void serialMatMul(const float *A, const float *B, float *C, int N);
 
 
-void checkCudaError(cudaError_t err, const char *msg);
+cudaError_t checkCudaError(cudaError_t err, const char *msg);
 void checkCublasError(cublasStatus_t status, const char *msg);
 
 /*! 
@@ -54,7 +54,15 @@ void cublasMatMul(const float *d_A, const float *d_B, float *d_C, int N, float* 
 
 /*!
     @brief      Function to perform batched matrix multiplication of two matrices A and B using CUDA tensor cores
+    @details    Performing a batched matrix multiplication of two matrices A and B and storing the result in matrix C. 
+                The matrices are of size N x N.
+    @param      A[in] Pointer to the first matrix in ROW MAJOR format, the matrix is allocated in HOST memory
+    @param      B[in] Pointer to the second matrix in ROW MAJOR format, the matrix is allocated in HOST memory
+    @param      C[out] Pointer to the resultant matrix in ROW MAJOR format, the matrix is allocated in device memory
+    @param      N[in] Size of the row/column of the matrices
+    @param      milliseconds[out] Time taken to perform the matrix multiplication
+    @param      TFLOPS[out] Theoretical peak FLOPS achieved during the matrix multiplication
 */
-void tensorCoreMatMul(const float *d_A, const float *d_B, float *d_C, int N, int blockSize, float* milliseconds, double* TFLOPS);
+void tensorCoreMatMul(const float *h_A, const float *h_B, float *d_C, int N, float* milliseconds, double* TFLOPS);
 
 #endif // MATMUL_H

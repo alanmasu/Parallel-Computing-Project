@@ -20,7 +20,7 @@ INCLUDE_FLAGS = $(addprefix -I, $(INCLUDE_DIRS))
 
 # Compilatore e flags
 NVCC = nvcc
-NVCC_FLAGS = -O3 $(INCLUDE_FLAGS) -lcublas
+NVCC_FLAGS = -O3 $(INCLUDE_FLAGS) -lcublas -DTESTING -arch=sm_80
 
 main: all
 
