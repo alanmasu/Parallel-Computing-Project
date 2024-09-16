@@ -14,6 +14,7 @@
 
 module load cuda/12.1
 cd /home/alan.masutti/Project
+git stash save "Stashing changes for Job Execution"
 git checkout MatMul
 make
 srun /home/alan.masutti/Project/build/bin/main
