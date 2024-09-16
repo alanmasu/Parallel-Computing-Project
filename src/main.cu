@@ -21,12 +21,18 @@ __global__ void simpleKernel(int n, int bs){
     int bRow = blockIdx.y * blockDim.y + threadIdx.y;
     int bCol = blockIdx.x * blockDim.x + threadIdx.x;
     for(int i = 0; i < N_BLOCKS; ++i){
+        //Fatto dai tensor core
         printf("c'[%d][%d] = a[%d][%d] X b[%d][%d]\n", bRow, bCol, bRow, i, i, bCol);
     }
+    __syncthreads();
+    // con i cuda cores accumulo il risultato in c
+    
+
+
 }
 
 int main(int argc, char **argv){
-    dim3 threadsPerBlock(1, 1);
+    dim3 threadsPerBlock(BS, BS);
     dim3 numBlocks(N / BS, N / BS);
 
     simpleKernel<<<numBlocks,threadsPerBlock>>>(N, BS); 
