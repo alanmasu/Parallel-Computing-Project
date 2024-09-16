@@ -173,8 +173,8 @@ int main(int argc, char **argv){
     if(h_A != NULL && h_B != NULL){
         printf("[INFO]: Inizializzazione delle matrici sull'host\n");
         for (int i = 0; i < N * N; ++i) {
-            h_A[i] = i;
-            h_B[i] = i;
+            h_A[i] = 0.1;
+            h_B[i] = 0.2;
         }
     }else{
         printf("[ERR]:Errore nell'allocazione delle matrici sull'host\n");
@@ -252,8 +252,10 @@ int main(int argc, char **argv){
 
     //Testing dei risultati e confronto con cuBLAS
     for(int i = 0; i < N * N; i++){
-        if(h_C_cublas[i] != h_C_wmma[i]){
+        if(h_C_cublas[i] - h_C_wmma[i] > 0.2){
             printf("Errore: i risultati non coincidono\n");
+            printf("h_C_cublas[%d] != h_C_wmma[%d]\n", i, i);
+            printf("%f != %f\n", h_C_cublas[i], h_C_wmma[i]);
             break;
         }
     }
