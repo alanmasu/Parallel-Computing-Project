@@ -151,7 +151,7 @@ int main(int argc, char **argv) {
 #warning "Testing mode"
 int main(){
     // Puntatori per le matrici sull'host
-    float *h_A, *h_B, *h_C_cublas, *h_C_wmma;
+    float *h_A = NULL, *h_B = NULL, *h_C_cublas = NULL, *h_C_wmma = NULL;
 
     // Allocazione delle matrici sull'host (CPU)
     size_t matrix_size = N * N * sizeof(float);
@@ -173,7 +173,7 @@ int main(){
     }
 
     //Allocazione sul device (GPU)
-    float *d_A, *d_B, *d_C;
+    float *d_A = NULL, *d_B = NULL, *d_C = NULL;
     cudaError_t err1 = checkCudaError(cudaMalloc((void **)&d_A, matrix_size), "Allocazione matrice A su GPU");
     cudaError_t err2 = checkCudaError(cudaMalloc((void **)&d_B, matrix_size), "Allocazione matrice B su GPU");
     cudaError_t err3 = checkCudaError(cudaMalloc((void **)&d_C, matrix_size), "Allocazione matrice C su GPU");
