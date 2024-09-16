@@ -14,6 +14,6 @@
 
 module load cuda/12.1
 cd /home/alan.masutti/Project
-git checkout testingFeature
+git checkout MatMul
 make
-srun /home/alan.masutti/Project/build/bin/main "Testing results saver feature"
+srun /home/alan.masutti/Project/build/bin/main
