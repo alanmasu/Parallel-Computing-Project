@@ -133,6 +133,16 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *c,
 
 // Funzione per la moltiplicazione di matrici su GPU con Tensor Cores e WMMA
 void tensorCoreMatMul(const float *h_A, const float *h_B, float *d_C, int N, float* milliseconds, double* TFLOPS) {
+    
+    if(h_A == NULL || h_B == NULL || d_C == NULL){
+        printf("[ERROR]: unable to perform MatMul caused by NULL pointers\n");
+        if(milliseconds != NULL && TFLOPS != NULL){
+            *milliseconds = -1;
+            *TFLOPS = -1;
+        }
+        return;
+    }
+    
     // Allocazione delle matrici A e B sul device
     int device_matrix_size = N * N * sizeof(half);
     half *A = NULL;
@@ -153,7 +163,7 @@ void tensorCoreMatMul(const float *h_A, const float *h_B, float *d_C, int N, flo
     printf("[INFO]: Allocazione delle matrici half A e B sulla GPU completata\n");
     
     //Conversione delle matrici in half
-    if( A != NULL && B != NULL && err1 == cudaSuccess && err2 == cudaSuccess){
+    if( h_Ahalf != NULL && h_Bhalf != NULL && err1 == cudaSuccess && err2 == cudaSuccess){
         for(int i = 0; i < N * N; ++i){
             h_Ahalf[i] = __float2half(h_A[i]);
             h_Bhalf[i] = __float2half(h_B[i]);
@@ -162,7 +172,7 @@ void tensorCoreMatMul(const float *h_A, const float *h_B, float *d_C, int N, flo
         checkCudaError(cudaMemcpy(B, h_Bhalf, device_matrix_size, cudaMemcpyHostToDevice), "Copia matrice B sulla GPU");
 
     }else{
-        printf("unable to perform MatMul caused by NULL pointers\n");
+        printf("[ERROR]: unable to perform MatMul caused by NULL pointers\n");
         if(milliseconds != NULL && TFLOPS != NULL){
             *milliseconds = -1;
             *TFLOPS = -1;

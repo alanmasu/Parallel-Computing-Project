@@ -53,7 +53,9 @@ int main(int argc, char **argv) {
     }
 
     // Puntatori per le matrici sull'host
-    float *h_A, *h_B, *h_C;
+    float *h_A = NULL;
+    float *h_B = NULL;
+    float *h_C = NULL;
 
     //Ciclo sulle size delle matrici
     for(int N = 16; N <= 16384; N *= 2){
@@ -80,13 +82,15 @@ int main(int argc, char **argv) {
         }
 
         //Allocazione sul device (GPU)
-        float *d_A, *d_B, *d_C;
-        checkCudaError(cudaMalloc((void **)&d_A, matrix_size), "Allocazione matrice A su GPU");
-        checkCudaError(cudaMalloc((void **)&d_B, matrix_size), "Allocazione matrice B su GPU");
-        checkCudaError(cudaMalloc((void **)&d_C, matrix_size), "Allocazione matrice C su GPU");
+        float *d_A = NULL;
+        float *d_B = NULL;
+        float *d_C = NULL;
+        cudaError_t err1 = checkCudaError(cudaMalloc((void **)&d_A, matrix_size), "Allocazione matrice A su GPU");
+        cudaError_t err2 = checkCudaError(cudaMalloc((void **)&d_B, matrix_size), "Allocazione matrice B su GPU");
+        cudaError_t err3 = checkCudaError(cudaMalloc((void **)&d_C, matrix_size), "Allocazione matrice C su GPU");
 
         // Copia delle matrici dall'host alla GPU
-        if(d_A != NULL && d_B != NULL && d_C != NULL){
+        if(err1 == cudaSuccess && err2 == cudaSuccess && err3 == cudaSuccess){
             checkCudaError(cudaMemcpy(d_A, h_A, matrix_size, cudaMemcpyHostToDevice), "Copia matrice A sulla GPU");
             checkCudaError(cudaMemcpy(d_B, h_B, matrix_size, cudaMemcpyHostToDevice), "Copia matrice B sulla GPU");
         }
@@ -117,28 +121,35 @@ int main(int argc, char **argv) {
         printf("\n\nTempo di esecuzione [cuBLAS] [size: %d]: %f ms\n", cublasMillis, N);
         printf("TFLOPS [cuBLAS] [size: %d]: %f\n", cublasTFLOPS, N);
 
+        // Libera la memoria sulla GPU
+        cudaFree(d_A);
+        cudaFree(d_B);
+        d_A = NULL;
+        d_B = NULL;
+
         /////// Custom Kernel ///////
-        for(int bs = 16; bs <= 256; bs *= 2){
-            // Moltiplicazione di matrici con kernel custom
-            //tensorCoreMatMul(d_A, d_B, d_C, N, blockSize, &myMillis, &myTFLOPS);
-            // Salva i risultati su file
-            if(resultFile != NULL){
-                fprintf(resultFile, "%d,%f,%f,%d,%f,%f\n", N, cublasMillis, cublasTFLOPS, bs, myMillis, myTFLOPS);
-            }else{
-                printf("[CSV]:\n");
-                printf("%d,%f,%f,%d,%f,%f\n", N, cublasMillis, cublasTFLOPS, bs, myMillis, myTFLOPS);
-                printf("[/CSV]\n");
-            }
+        // Moltiplicazione di matrici con kernel custom
+        tensorCoreMatMul(h_A, h_B, d_C, N, &myMillis, &myTFLOPS);
+        // Salva i risultati su file
+        if(resultFile != NULL){
+            fprintf(resultFile, "%d,%f,%f,%d,%f,%f\n", N, cublasMillis, cublasTFLOPS, 16, myMillis, myTFLOPS);
+        }else{
+            printf("[CSV]:\n");
+            printf("%d,%f,%f,%d,%f,%f\n", N, cublasMillis, cublasTFLOPS, 16, myMillis, myTFLOPS);
+            printf("[/CSV]\n");
         }
         // Libera la memoria sull'host
         free(h_A);
         free(h_B);
         free(h_C);
 
+        h_A = NULL;
+        h_B = NULL;
+        h_C = NULL;
+
         // Libera la memoria sulla GPU
-        cudaFree(d_A);
-        cudaFree(d_B);
         cudaFree(d_C);
+        d_C = NULL;
     }
     if(resultFile != NULL){
         fclose(resultFile);
