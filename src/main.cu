@@ -149,16 +149,22 @@ int main(int argc, char **argv) {
 #else
 #define N 64
 #warning "Testing mode"
-int main(){
+int main(int argc, char **argv){
+    printf("WMMA TEST: Testing mode\n");
     // Puntatori per le matrici sull'host
-    float *h_A = NULL, *h_B = NULL, *h_C_cublas = NULL, *h_C_wmma = NULL;
+    float *h_A = NULL;
+    float *h_B = NULL;
+    float *h_C_cublas = NULL;
+    float *h_C_wmma = NULL;
 
     // Allocazione delle matrici sull'host (CPU)
+    printf("[INFO]: Allocazione delle matrici sull'host\n");
     size_t matrix_size = N * N * sizeof(float);
     h_A = (float *)malloc(matrix_size);
     h_B = (float *)malloc(matrix_size);
     h_C_cublas = (float *)malloc(matrix_size);
     h_C_wmma = (float *)malloc(matrix_size);
+    printf("[INFO]: Allocazione delle matrici sull'host completata\n");
 
     // Inizializza le matrici A e B sull'host
     if(h_A != NULL && h_B != NULL){
