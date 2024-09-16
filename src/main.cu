@@ -179,14 +179,14 @@ int main(){
     cudaError_t err3 = checkCudaError(cudaMalloc((void **)&d_C, matrix_size), "Allocazione matrice C su GPU");
 
     // Copia delle matrici dall'host alla GPU
-    if(err1 != cudaSuccess && err2 != cudaSuccess && err3 != cudaSuccess){
+    if(err1 == cudaSuccess && err2 == cudaSuccess && err3 == cudaSuccess){
         printf("\n[INFO]Copia delle matrici sulla GPU\n");
         checkCudaError(cudaMemcpy(d_A, h_A, matrix_size, cudaMemcpyHostToDevice), "Copia matrice A sulla GPU");
         checkCudaError(cudaMemcpy(d_B, h_B, matrix_size, cudaMemcpyHostToDevice), "Copia matrice B sulla GPU");
         printf("Matrici copiate sulla GPU\n");
     }else{
-        printf("[ERR]: Errore nella copia delle matrici sulla GPU\n");
-        return 1;
+        printf("[ERR]: Errore nell'allocazione delle matrici sulla GPU\n");
+        return 2;
     }
     //Indicatori di performance
     float cublasMillis = 0;
