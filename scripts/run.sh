@@ -2,7 +2,7 @@
 #SBATCH --partition=edu5
 #SBATCH --nodes=1
 #SBATCH --tasks=1
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:0
 #SBATCH --cpus-per-task=1
 #SBATCH --time=00:05:00
 #SBATCH --job-name=test-project
@@ -15,6 +15,6 @@
 module load cuda/12.1
 cd /home/alan.masutti/Project
 git stash save "Stashing due to Job execution"
-git checkout dev
+git checkout Test_calcoli
 make
 srun /home/alan.masutti/Project/build/bin/main
