@@ -14,6 +14,6 @@
 
 module load cuda/12.1
 cd /home/alan.masutti/Project
-git checkout MatMul
+git checkout simple_kernel
 make
 srun /home/alan.masutti/Project/build/bin/main
