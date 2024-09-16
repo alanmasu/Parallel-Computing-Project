@@ -1,0 +1,6 @@
+M	src/main.cu
+make: Nothing to be done for 'main'.
+a[0][0] X b[0][0] -> Blocco formato da 4 blocchi 16x16 moltiplicati da WMMA
+a[0][1] X b[1][0]
+a[1][0] X b[0][1]
+a[1][1] X b[1][1]

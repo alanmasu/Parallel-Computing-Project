@@ -1,0 +1,12 @@
+M	src/main.cu
+make: Nothing to be done for 'main'.
+Qui possiamo vedere come con un indice 'i' che va da 0 a N/B e N/B blocchi di dimensione BSxBS 
+
+c'[0][0] = a[0][1] X b[1][0]
+c'[0][0] = a[0][0] X b[0][0]
+c'[0][1] = a[0][0] X b[0][1]
+c'[0][1] = a[0][1] X b[1][1]
+c'[1][0] = a[1][0] X b[0][0]
+c'[1][0] = a[1][1] X b[1][0]
+c'[1][1] = a[1][0] X b[0][1]
+c'[1][1] = a[1][1] X b[1][1]
