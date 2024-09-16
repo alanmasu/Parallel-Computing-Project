@@ -103,6 +103,7 @@ void cublasMatMul(const float *d_A, const float *d_B, float *d_C, int N, float* 
 
 
 // Kernel per la moltiplicazione di matrici usando Tensor Cores e WMMA
+#ifndef WMMA_BATCHED
 __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *c, int M) {
     // Matrici WMMA (warped matrix multiply and accumulate)
     wmma::fragment<wmma::matrix_a, TILE_SIZE, TILE_SIZE, TILE_SIZE, half, wmma::row_major> a_frag;
@@ -129,9 +130,38 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *c,
     // Scrivi il risultato nella matrice C
     wmma::store_matrix_sync(c + blockRow * TILE_SIZE * M + blockCol * TILE_SIZE, c_frag, M, wmma::mem_row_major);
 }
+#else
+#define WMMA_N 16
+__global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *c, int N, int bs) {
+    //Creazione dei fragment
+    wmma::fragment<wmma::matrix_a, WMMA_N, WMMA_N, WMMA_N, half, wmma::row_major> a_frag;
+    wmma::fragment<wmma::matrix_b, WMMA_N, WMMA_N, WMMA_N, half, wmma::row_major> b_frag;
+    wmma::fragment<wmma::accumulator, WMMA_N, WMMA_N, WMMA_N, float> c_frag;
 
+    //Coordinate di blocco
+    int bRow = blockIdx.y * blockDim.y;
+    int bCol = blockIdx.x * blockDim.x;
+
+    //Numero di blocchi
+    int numBlocks = N / bs;
+
+    //Moltiplico i blocchi BSxBS con i tensor core
+    for(int  = 0; i < numBlocks; ++i){
+        //Carico le matrici
+        wmma::load_matrix_sync(a_frag, a + (bRow * N + i * bs), N);
+        wmma::load_matrix_sync(b_frag, b + (i * bs * N + bCol), N);
+
+        //Moltiplico le matrici
+        wmma::mma_sync(c_frag, a_frag, b_frag, c_frag);
+    }
+
+
+
+}
+#endif // WMMA_BATCHED
 
 // Funzione per la moltiplicazione di matrici su GPU con Tensor Cores e WMMA
+#ifndef WMMA_BATCHED
 void tensorCoreMatMul(const float *h_A, const float *h_B, float *d_C, int N, float* milliseconds, double* TFLOPS) {
     
     if(h_A == NULL || h_B == NULL || d_C == NULL){
@@ -223,3 +253,6 @@ void tensorCoreMatMul(const float *h_A, const float *h_B, float *d_C, int N, flo
     free(h_Bhalf);
 
 }
+#else
+
+#endif // WMMA_BATCHED

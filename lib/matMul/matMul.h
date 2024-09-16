@@ -62,7 +62,13 @@ void cublasMatMul(const float *d_A, const float *d_B, float *d_C, int N, float* 
     @param      N[in] Size of the row/column of the matrices
     @param      milliseconds[out] Time taken to perform the matrix multiplication
     @param      TFLOPS[out] Theoretical peak FLOPS achieved during the matrix multiplication
+    @param      bs[in] Size of the block to be used for matrix multiplication
+    @note       The 'bs' parameter is only used when WMMA_BATCHED is defined
 */
-void tensorCoreMatMul(const float *h_A, const float *h_B, float *d_C, int N, float* milliseconds, double* TFLOPS);
+#ifndef WMMA_BATCHED
+    void tensorCoreMatMul(const float *h_A, const float *h_B, float *d_C, int N, float* milliseconds, double* TFLOPS);
+#else
+    void tensorCoreMatMul(const float *h_A, const float *h_B, float *d_C, int N, int bs, float* milliseconds, double* TFLOPS);
+#endif
 
 #endif // MATMUL_H
