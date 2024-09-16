@@ -157,20 +157,25 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *c,
         printf("c[%d][%d] = a[%d][%d] * b[%d][%d]\n", cStartingRow, cStartingCol, bRow, aStartingCol, bStartingRow, bCol);
         //Creo una matrice temporanea per il risultato (è una matrice BSxBS)
         __shared__ float c_temp[bs * bs] = {0};
-        // for(int r = 0; r < bs; ++r){
-        //     for(int c = 0; c < bs; ++c){
-        //         int aCol = aStartingCol + c * WMMA_N;
-        //         int bRow = bStartingRow + c * N;
-        //     }
-        // }
-        //Carico le matrici
-        wmma::load_matrix_sync(a_frag, a + (bRow * N + i * bs), N);
-        wmma::load_matrix_sync(b_frag, b + (i * bs * N + bCol), N);
+        for(int r = 0; r < bs; ++r){
+            for(int c = 0; c < bs; ++c){
+                for(int i = 0; i < bs; ++i){
+                    int aCol = aStartingCol + i * WMMA_N;
+                    int bRow = bStartingRow + i * N * WMMA_N;
+                    //Carico le matrici
+                    wmma::load_matrix_sync(a_frag, a + cStartingRow + aCol, N);
+                    wmma::load_matrix_sync(b_frag, b + bRow + cStartingCol, N);
 
-        //Moltiplico le matrici
-        wmma::mma_sync(c_frag, a_frag, b_frag, c_frag);
+                    //Moltiplico le matrici
+                    wmma::mma_sync(c_frag, a_frag, b_frag, c_frag);
+                }
+                wmma::store_matrix_sync(c_temp + bs*r + c , c_frag, N, wmma::mem_row_major);
+            }
+        }
+
+        __syncthreads();
+        
     }
-    wmma::store_matrix_sync(c + cStartingRow + cStartingCol, c_frag, N, wmma::mem_row_major);
 
 
 }
