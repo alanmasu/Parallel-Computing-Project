@@ -152,15 +152,17 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *c,
     for(int k = 0; k < numBlocks; ++k){
         //Moltiplico all'interno dei blocchi BSxBS con i tensor cores
         //Simple batched matrix multiplication
-        int aStartingCol = 
-        int bStartingRow = 
+        int aStartingCol = cStartingCol + k * bs;
+        int bStartingRow = cStartingRow + k * bs * N;
+        printf("c[%d][%d] = a[%d][%d] * b[%d][%d]\n", cStartingRow, cStartingCol, bRow, aStartingCol, bStartingRow, bCol);
         //Creo una matrice temporanea per il risultato (è una matrice BSxBS)
         __shared__ float c_temp[bs * bs] = {0};
-        for(int r = 0; r < bs; ++r){
-            for(int c = 0; c < bs; ++c){
-                
-            }
-        }
+        // for(int r = 0; r < bs; ++r){
+        //     for(int c = 0; c < bs; ++c){
+        //         int aCol = aStartingCol + c * WMMA_N;
+        //         int bRow = bStartingRow + c * N;
+        //     }
+        // }
         //Carico le matrici
         wmma::load_matrix_sync(a_frag, a + (bRow * N + i * bs), N);
         wmma::load_matrix_sync(b_frag, b + (i * bs * N + bCol), N);
