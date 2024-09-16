@@ -161,21 +161,32 @@ int main(){
     h_C_wmma = (float *)malloc(matrix_size);
 
     // Inizializza le matrici A e B sull'host
-    for (int i = 0; i < N * N; ++i) {
-        h_A[i] = i;
-        h_B[i] = i;
+    if(h_A != NULL && h_B != NULL){
+        printf("[INFO]: Inizializzazione delle matrici sull'host\n");
+        for (int i = 0; i < N * N; ++i) {
+            h_A[i] = i;
+            h_B[i] = i;
+        }
+    }else{
+        printf("[ERR]:Errore nell'allocazione delle matrici sull'host\n");
+        return 1;
     }
 
     //Allocazione sul device (GPU)
     float *d_A, *d_B, *d_C;
-    checkCudaError(cudaMalloc((void **)&d_A, matrix_size), "Allocazione matrice A su GPU");
-    checkCudaError(cudaMalloc((void **)&d_B, matrix_size), "Allocazione matrice B su GPU");
-    checkCudaError(cudaMalloc((void **)&d_C, matrix_size), "Allocazione matrice C su GPU");
+    cudaError_t err1 = checkCudaError(cudaMalloc((void **)&d_A, matrix_size), "Allocazione matrice A su GPU");
+    cudaError_t err2 = checkCudaError(cudaMalloc((void **)&d_B, matrix_size), "Allocazione matrice B su GPU");
+    cudaError_t err3 = checkCudaError(cudaMalloc((void **)&d_C, matrix_size), "Allocazione matrice C su GPU");
 
     // Copia delle matrici dall'host alla GPU
-    if(d_A != NULL && d_B != NULL && d_C != NULL){
+    if(err1 != cudaSuccess && err2 != cudaSuccess && err3 != cudaSuccess){
+        printf("\n[INFO]Copia delle matrici sulla GPU\n");
         checkCudaError(cudaMemcpy(d_A, h_A, matrix_size, cudaMemcpyHostToDevice), "Copia matrice A sulla GPU");
         checkCudaError(cudaMemcpy(d_B, h_B, matrix_size, cudaMemcpyHostToDevice), "Copia matrice B sulla GPU");
+        printf("Matrici copiate sulla GPU\n");
+    }else{
+        printf("[ERR]: Errore nella copia delle matrici sulla GPU\n");
+        return 1;
     }
     //Indicatori di performance
     float cublasMillis = 0;
