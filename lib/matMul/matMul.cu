@@ -135,10 +135,22 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *c,
 void tensorCoreMatMul(const float *h_A, const float *h_B, float *d_C, int N, float* milliseconds, double* TFLOPS) {
     // Allocazione delle matrici A e B sul device
     int device_matrix_size = N * N * sizeof(half);
-    half *A, *B, *h_Ahalf, *h_Bhalf;
+    half *A = NULL;
+    half *B = NULL; 
+    half *h_Ahalf = NULL; 
+    half *h_Bhalf = NULL;
     
+    //Allocazione delle matrici sull'host
+    printf("[INFO]: Allocazione delle matrici half A e B sull'host\n");
+    h_Ahalf = (half *)malloc(device_matrix_size);
+    h_Bhalf = (half *)malloc(device_matrix_size);
+    printf("[INFO]: Allocazione delle matrici half A e B sull'host completata\n");
+
+    //Allocazione delle matrici sul device
+    printf("[INFO]: Allocazione delle matrici half A e B sulla GPU\n");
     cudaError_t err1 = checkCudaError(cudaMalloc((void **)&A, device_matrix_size), "Allocazione matrice A su GPU");
     cudaError_t err2 = checkCudaError(cudaMalloc((void **)&B, device_matrix_size), "Allocazione matrice B su GPU");
+    printf("[INFO]: Allocazione delle matrici half A e B sulla GPU completata\n");
     
     //Conversione delle matrici in half
     if( A != NULL && B != NULL && err1 == cudaSuccess && err2 == cudaSuccess){
