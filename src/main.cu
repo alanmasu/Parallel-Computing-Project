@@ -172,10 +172,10 @@ __global__ void simpleKernel(int n, int bs){
 }
 
 int main(int argc, char **argv){
-    dim3 threadsPerBlock(32, 32);
+    // dim3 threadsPerBlock(32, 32);
     dim3 numBlocks(N / BS, N / BS);
 
-    simpleKernel<<<numBlocks,threadsPerBlock>>>(N, BS); 
+    simpleKernel<<<numBlocks,1>>>(N, BS); 
     cudaDeviceSynchronize();
     return 0;
 }
