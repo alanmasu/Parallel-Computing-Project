@@ -16,4 +16,4 @@ module load cuda/12.1
 cd /home/alan.masutti/Project
 git checkout MatMul
 make
-srun /home/alan.masutti/Project/build/bin/main "Testing my MatMul Algorithm"
+srun /home/alan.masutti/Project/build/bin/main
