@@ -154,9 +154,9 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *c,
     for(int k = 0; k < numBlocks; ++k){
         //Moltiplico all'interno dei blocchi BSxBS con i tensor cores
         //Simple batched matrix multiplication
-        int aStartingCol = cStartingCol + k * bs;
-        int bStartingRow = cStartingRow + k * bs * n;
-        printf("c[%d][%d] = a[%d][%d] * b[%d][%d]\n", cStartingRow, cStartingCol, bRow, aStartingCol, bStartingRow, bCol);
+        int aStartingCol = k * bs;
+        int bStartingRow = k * bs * n;
+        printf("c[%d][%d] = a[%d][%d] * b[%d][%d]\n", cStartingRow, cStartingCol, cStartingRow, aStartingCol, bStartingRow, cStartingCol);
         // //Creo una matrice temporanea per il risultato (è una matrice BS x BS) moltiplicando i 
         // // rispettivi blocchi di matrici di dimensione WMMA_N x WMMA_N
         // extern __shared__ float c_temp[];
@@ -324,7 +324,7 @@ void tensorCoreMatMul(const float *h_A, const float *h_B, float *d_C, int n, int
     }
     // Configura la griglia e i blocchi per la computazione
     dim3 threadsPerBlock(32, 32);
-    dim3 numBlocks(n / TILE_SIZE, n / TILE_SIZE);
+    dim3 numBlocks(n / bs, n / bs);
 
     // Misurazione del tempo
     cudaEvent_t start, stop;
@@ -335,7 +335,8 @@ void tensorCoreMatMul(const float *h_A, const float *h_B, float *d_C, int n, int
     cudaEventRecord(start, 0);
     
     // Esegui il kernel per la moltiplicazione di matrici con Tensor Cores e WMMA
-    matrixMultiplyTensorCore<<<numBlocks, threadsPerBlock>>>(A, B, d_C, n, bs);
+    // matrixMultiplyTensorCore<<<numBlocks, threadsPerBlock>>>(A, B, d_C, n, bs);
+    matrixMultiplyTensorCore<<<numBlocks, 1>>>(A, B, d_C, n, bs);
     
     // Ferma il timer
     cudaEventRecord(stop, 0);
