@@ -160,6 +160,7 @@ int main(int argc, char **argv) {
 #else
 
 #define N 64
+#define BS 32
 
 #warning "Testing mode"
 
@@ -220,7 +221,7 @@ int main(int argc, char **argv){
     ///////////////////// ALGORHITMs ///////////////////////
     /////// cuBLAS ///////
     // Moltiplicazione di matrici con cuBLAS
-    cublasMatMul(d_A, d_B, d_C, N, &cublasMillis, &cublasTFLOPS); 
+    cublasMatMul(d_A, d_B, d_C, N,&cublasMillis, &cublasTFLOPS); 
     // Copia dei risultati dalla GPU all'host
     checkCudaError(cudaMemcpy(h_C_cublas, d_C, matrix_size, cudaMemcpyDeviceToHost), "Copia matrice C dall'host");
     //Stampa delle matrici
@@ -244,7 +245,11 @@ int main(int argc, char **argv){
 
     /////// Custom Kernel ///////
     // Moltiplicazione di matrici con kernel custom
+#ifdef WMMA_BATCHED
+    tensorCoreMatMul(h_A, h_B, d_C, N, BS, &myMillis, &myTFLOPS);
+#else
     tensorCoreMatMul(h_A, h_B, d_C, N, &myMillis, &myTFLOPS);
+#endif
     // Copia dei risultati dalla GPU all'host
     checkCudaError(cudaMemcpy(h_C_wmma, d_C, matrix_size, cudaMemcpyDeviceToHost), "Copia matrice C dal device");
     //Stampa delle matrici

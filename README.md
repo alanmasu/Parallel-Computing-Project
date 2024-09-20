@@ -49,9 +49,13 @@ To clean the scheduler output you can use the following command:
 make clean
 ```
 
-If you want to remove also the object files you can use the following command:
+If you want to remove the object files you can use the following command:
+```bash
+make cleanbuild
+```
+
+If you want to remove the object files and the executable you can use the following command:
 ```bash
 make cleanall
 ```
-
 

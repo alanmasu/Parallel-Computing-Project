@@ -51,6 +51,9 @@ clean:
 	rm -rf $(OUTPUT_DIR) 
 	mkdir -p $(OUTPUT_DIR)
 
-# Pulizia più approfondita
-cleanall: clean
+# Pulizia dei file oggetto e dell'eseguibile
+cleanbuild:
 	rm -rf $(BIN_DIR) $(OBJ_DIR)
+
+# Pulizia più approfondita
+cleanall: clean cleanbuild
