@@ -156,25 +156,29 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *c,
         //Simple batched matrix multiplication
         int aStartingCol = k * bs;
         int bStartingRow = k * bs * n;
-        printf("c[%d][%d] = a[%d][%d] * b[%d][%d]\n", cStartingRow, cStartingCol, cStartingRow, aStartingCol, bStartingRow, cStartingCol);
+        // printf("c[%d][%d] = a[%d][%d] * b[%d][%d]\n", cStartingRow, cStartingCol, cStartingRow, aStartingCol, bStartingRow, cStartingCol);
         // //Creo una matrice temporanea per il risultato (è una matrice BS x BS) moltiplicando i 
         // // rispettivi blocchi di matrici di dimensione WMMA_N x WMMA_N
         // extern __shared__ float c_temp[];
-        // for(int r = 0; r < bs; ++r){
-        //     for(int c = 0; c < bs; ++c){
-        //         for(int i = 0; i < bs; ++i){
-        //             int aCol = aStartingCol + i * WMMA_N;
-        //             int bRow = bStartingRow + i * n* WMMA_N;
-        //             //Carico le matrici
-        //             wmma::load_matrix_sync(a_frag, a + cStartingRow + aCol, n);
-        //             wmma::load_matrix_sync(b_frag, b + bRow + cStartingCol, n);
+        for(int r = 0; r < bs/WMMA_N; ++r){
+            for(int c = 0; c < bs/WMMA_N; ++c){
+                for(int i = 0; i < bs/WMMA_N; ++i){
+                    int cCol = cStartingCol + c * WMMA_N;
+                    int cRow = cStartingRow + r * n * WMMA_N;
+                    int aCol = aStartingCol + i * WMMA_N;
+                    int bRow = bStartingRow + i * n * WMMA_N;
+                    printf("c[%d][%d] = a[%d][%d] * b[%d][%d]\n", cRow/n, cCol, cRow/n, aCol, bRow/n, cCol);
 
-        //             //Moltiplico le matrici
-        //             wmma::mma_sync(c_frag, a_frag, b_frag, c_frag);
-        //         }
-        //         wmma::store_matrix_sync(c_temp + bs*r + c , c_frag, n, wmma::mem_row_major);
-        //     }
-        // }
+                    //Carico le matrici
+                    // wmma::load_matrix_sync(a_frag, a + cStartingRow + aCol, n);
+                    // wmma::load_matrix_sync(b_frag, b + bRow + cStartingCol, n);
+
+                    //Moltiplico le matrici
+                    // wmma::mma_sync(c_frag, a_frag, b_frag, c_frag);
+                }
+                // wmma::store_matrix_sync(c_temp + bs*r + c , c_frag, n, wmma::mem_row_major);
+            }
+        }
         // __syncthreads();
         
     }
@@ -335,7 +339,8 @@ void tensorCoreMatMul(const float *h_A, const float *h_B, float *d_C, int n, int
     cudaEventRecord(start, 0);
     
     // Esegui il kernel per la moltiplicazione di matrici con Tensor Cores e WMMA
-    matrixMultiplyTensorCore<<<numBlocks, threadsPerBlock>>>(A, B, d_C, n, bs);
+    // matrixMultiplyTensorCore<<<numBlocks, threadsPerBlock>>>(A, B, d_C, n, bs);
+    matrixMultiplyTensorCore<<<numBlocks, 1>>>(A, B, d_C, n, bs);
     
     // Ferma il timer
     cudaEventRecord(stop, 0);
