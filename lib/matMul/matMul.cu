@@ -335,8 +335,7 @@ void tensorCoreMatMul(const float *h_A, const float *h_B, float *d_C, int n, int
     cudaEventRecord(start, 0);
     
     // Esegui il kernel per la moltiplicazione di matrici con Tensor Cores e WMMA
-    // matrixMultiplyTensorCore<<<numBlocks, threadsPerBlock>>>(A, B, d_C, n, bs);
-    matrixMultiplyTensorCore<<<numBlocks, 1>>>(A, B, d_C, n, bs);
+    matrixMultiplyTensorCore<<<numBlocks, threadsPerBlock>>>(A, B, d_C, n, bs);
     
     // Ferma il timer
     cudaEventRecord(stop, 0);
