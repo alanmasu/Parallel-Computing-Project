@@ -18,6 +18,15 @@ void printMat(float *mat, int rows, int cols) {
     }
 }
 
+void printNMat(float *mat, int rows, int cols, int N) {
+    for (int i = 0; i < rows; ++i) {
+        for (int j = 0; j < cols; ++j) {
+            printf("%f ", mat[i * N + j]);
+        }
+        printf("\n");
+    }
+}
+
 #ifndef TESTING
 int main(int argc, char **argv) {
     // Recupero dell'ora corrente per la creazione del file di output
@@ -182,12 +191,15 @@ int main(int argc, char **argv){
     printf("[INFO]: Allocazione delle matrici sull'host completata\n");
 
     // Inizializza le matrici A e B sull'host
-    if(h_A != NULL && h_B != NULL){
+    if(h_A != NULL && h_B != NULL && h_C_wmma != NULL){
         printf("[INFO]: Inizializzazione delle matrici sull'host\n");
         for (int i = 0; i < N * N; ++i) {
-            h_A[i] = 0.1;
-            h_B[i] = 0.2;
+            // h_A[i] = 0.1;
+            // h_B[i] = 0.2;
+            h_A[i] = i;
+            h_B[i] = i;
         }
+        memset(h_C_wmma, 0, matrix_size);
     }else{
         printf("[ERR]:Errore nell'allocazione delle matrici sull'host\n");
         return 1;
@@ -206,6 +218,7 @@ int main(int argc, char **argv){
         printf("\n[INFO]: Copia delle matrici sulla GPU\n");
         checkCudaError(cudaMemcpy(d_A, h_A, matrix_size, cudaMemcpyHostToDevice), "Copia matrice A sulla GPU");
         checkCudaError(cudaMemcpy(d_B, h_B, matrix_size, cudaMemcpyHostToDevice), "Copia matrice B sulla GPU");
+        checkCudaError(cudaMemcpy(d_C, h_C_wmma, matrix_size, cudaMemcpyHostToDevice), "Copia matrice C sulla GPU");
         printf("[INFO]: Matrici copiate sulla GPU\n");
     }else{
         printf("[ERR]: Errore nell'allocazione delle matrici sulla GPU\n");
@@ -260,6 +273,14 @@ int main(int argc, char **argv){
         printMat(h_B, N, N);
         printf("Matrice C:\n");
         printMat(h_C_wmma, N, N);
+    }else{
+        //Print the first 2x2 matrix
+        printf("Matrice A:\n");
+        printNMat(h_A, 2, 2, N);
+        printf("Matrice B:\n");
+        printNMat(h_B, 2, 2, N);
+        printf("Matrice C:\n");
+        printNMat(h_C_wmma, 2, 2, N);
     }
 
     // Stampa dei risultati
@@ -269,7 +290,7 @@ int main(int argc, char **argv){
     //Testing dei risultati e confronto con cuBLAS
     for(int i = 0; i < N * N; i++){
         if(h_C_cublas[i] - h_C_wmma[i] > 0.2){
-            printf("Errore: i risultati non coincidono\n");
+            printf("\n\n[ERRORE]: i risultati non coincidono\n");
             printf("h_C_cublas[%d] != h_C_wmma[%d]\n", i, i);
             printf("%f != %f\n", h_C_cublas[i], h_C_wmma[i]);
             break;
