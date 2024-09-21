@@ -286,7 +286,6 @@ void tensorCoreMatMul(const float *h_A, const float *h_B, float *d_C, int n, flo
     // Libera la memoria sull'host
     free(h_Ahalf);
     free(h_Bhalf);
-
 }
 #else
 void tensorCoreMatMul(const float *h_A, const float *h_B, float *d_C, int n, int bs, float* milliseconds, double* TFLOPS) {
@@ -315,12 +314,13 @@ void tensorCoreMatMul(const float *h_A, const float *h_B, float *d_C, int n, int
 
     //Allocazione delle matrici sul device
     printf("[INFO]: Allocazione delle matrici half A e B sulla GPU\n");
-    cudaError_t err1 = checkCudaError(cudaMalloc((void **)&A, device_matrix_size), "Allocazione matrice A su GPU");
-    cudaError_t err2 = checkCudaError(cudaMalloc((void **)&B, device_matrix_size), "Allocazione matrice B su GPU");
-    printf("[INFO]: Allocazione delle matrici half A e B sulla GPU completata\n");
+    cudaError_t err1 = checkCudaError(cudaMalloc((void **)&A, device_matrix_size), "Allocazione matrice A (half) su GPU");
+    cudaError_t err2 = checkCudaError(cudaMalloc((void **)&B, device_matrix_size), "Allocazione matrice B (half) su GPU");
     
     //Conversione delle matrici in half
     if( h_Ahalf != NULL && h_Bhalf != NULL && err1 == cudaSuccess && err2 == cudaSuccess){
+        printf("[INFO]: Allocazione delle matrici half A e B sulla GPU completata\n");
+        printf("[INFO]: Conversione delle matrici A e B in half\n");
         for(int i = 0; i < n * n; ++i){
             h_Ahalf[i] = __float2half(h_A[i]);
             h_Bhalf[i] = __float2half(h_B[i]);

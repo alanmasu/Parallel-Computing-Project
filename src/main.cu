@@ -67,7 +67,8 @@ int main(int argc, char **argv) {
     float *h_C = NULL;
 
     //Ciclo sulle size delle matrici
-    for(int N = 16; N <= 16384; N *= 2){
+    for(int N = 64; N <= 16384; N *= 2){
+        printf("\n\nStarting run with size: %d\n", N);
         // Allocazione delle matrici sull'host (CPU)
         size_t matrix_size = N * N * sizeof(float);
         h_A = (float *)malloc(matrix_size);
@@ -81,7 +82,6 @@ int main(int argc, char **argv) {
             }
             return 1;
         }
-
         // Inizializza le matrici A e B sull'host
         for (int i = 0; i < N * N; ++i) {
             h_A[i] = static_cast<float>(rand()) / RAND_MAX;
@@ -127,7 +127,7 @@ int main(int argc, char **argv) {
         }
 
         // Stampa dei risultati
-        printf("\n\nTempo di esecuzione [cuBLAS] [size: %d]: %f ms\n", cublasMillis, N);
+        printf("Tempo di esecuzione [cuBLAS] [size: %d]: %f ms\n", cublasMillis, N);
         printf("TFLOPS [cuBLAS] [size: %d]: %f\n", cublasTFLOPS, N);
 
         // Libera la memoria sulla GPU
@@ -137,6 +137,7 @@ int main(int argc, char **argv) {
         d_B = NULL;
 
         /////// Custom Kernel ///////
+    #ifndef WMMA_BATCHED
         // Moltiplicazione di matrici con kernel custom
         tensorCoreMatMul(h_A, h_B, d_C, N, &myMillis, &myTFLOPS);
         // Salva i risultati su file
@@ -147,6 +148,21 @@ int main(int argc, char **argv) {
             printf("%d,%f,%f,%d,%f,%f\n", N, cublasMillis, cublasTFLOPS, 16, myMillis, myTFLOPS);
             printf("[/CSV]\n");
         }
+    #else
+        for(int bs = 32; bs <= 256 && bs < N; bs *= 2){
+            printf("\nStarting run with block size: %d\n", bs);
+            // Moltiplicazione di matrici con kernel custom
+            tensorCoreMatMul(h_A, h_B, d_C, N, bs, &myMillis, &myTFLOPS);
+            // Salva i risultati su file
+            if(resultFile != NULL){
+                fprintf(resultFile, "%d,%f,%f,%d,%f,%f\n", N, cublasMillis, cublasTFLOPS, bs, myMillis, myTFLOPS);
+            }else{
+                printf("[CSV]:\n");
+                printf("%d,%f,%f,%d,%f,%f\n", N, cublasMillis, cublasTFLOPS, bs, myMillis, myTFLOPS);
+                printf("[/CSV]\n");
+            }
+        }
+    #endif
         // Libera la memoria sull'host
         free(h_A);
         free(h_B);
