@@ -131,15 +131,32 @@ int main(int argc, char **argv) {
         printf("TFLOPS [cuBLAS] [size: %d]: %f\n", cublasTFLOPS, N);
 
         // Libera la memoria sulla GPU
-        cudaFree(d_A);
-        cudaFree(d_B);
-        d_A = NULL;
-        d_B = NULL;
+        if(err1 == cudaSuccess && err2 == cudaSuccess){
+            cudaFree(d_A);
+            cudaFree(d_B);
+            d_A = NULL;
+            d_B = NULL;
+        }
 
         /////// Custom Kernel ///////
+        half* d_A_half = NULL;
+        half* d_B_half = NULL;
+        
+        // Allocazione delle matrici sul device e conversione in half
+        printf("[INFO]: Allocazione delle matrici half A e B sulla GPU\n");
+        err1 = convertFloatToHalf(h_A, &d_A_half, N);
+        err2 = convertFloatToHalf(h_B, &d_B_half, N);
+        if(err1 != cudaSuccess || err2 != cudaSuccess){
+            printf("[ERR]: Errore nell'allocazione e conversione delle matrici in half\n");
+            d_A_half = NULL;
+            d_B_half = NULL;
+        }else{
+            printf("[INFO]: Allocazione delle matrici half A e B sulla GPU completata\n");
+        }
+
     #ifndef WMMA_BATCHED
         // Moltiplicazione di matrici con kernel custom
-        tensorCoreMatMul(h_A, h_B, d_C, N, &myMillis, &myTFLOPS);
+        tensorCoreMatMul(d_A_half, d_B_half, d_C, N, &myMillis, &myTFLOPS);
         // Salva i risultati su file
         if(resultFile != NULL){
             fprintf(resultFile, "%d,%f,%f,%d,%f,%f\n", N, cublasMillis, cublasTFLOPS, 16, myMillis, myTFLOPS);
@@ -149,10 +166,11 @@ int main(int argc, char **argv) {
             printf("[/CSV]\n");
         }
     #else
-        for(int bs = 32; bs <= 256 && bs < N; bs *= 2){
+        for(int bs = 16; bs <= 256 && bs < N; bs *= 2){
+            // const int bs = 32;
             printf("\nStarting run with block size: %d\n", bs);
             // Moltiplicazione di matrici con kernel custom
-            tensorCoreMatMul(h_A, h_B, d_C, N, bs, &myMillis, &myTFLOPS);
+            tensorCoreMatMul(d_A_half, d_B_half, d_C, N, bs, &myMillis, &myTFLOPS);
             // Salva i risultati su file
             if(resultFile != NULL){
                 fprintf(resultFile, "%d,%f,%f,%d,%f,%f\n", N, cublasMillis, cublasTFLOPS, bs, myMillis, myTFLOPS);
@@ -164,17 +182,25 @@ int main(int argc, char **argv) {
         }
     #endif
         // Libera la memoria sull'host
-        free(h_A);
-        free(h_B);
-        free(h_C);
+        if(h_A != NULL && h_B != NULL && h_C != NULL){
+            free(h_A);
+            free(h_B);
+            free(h_C);
 
-        h_A = NULL;
-        h_B = NULL;
-        h_C = NULL;
+            h_A = NULL;
+            h_B = NULL;
+            h_C = NULL;
+        }
 
         // Libera la memoria sulla GPU
-        cudaFree(d_C);
-        d_C = NULL;
+        if(err1 == cudaSuccess && err2 == cudaSuccess && err3 == cudaSuccess){
+            cudaFree(d_A_half);
+            cudaFree(d_B_half);
+            cudaFree(d_C);
+            d_A_half = NULL;
+            d_B_half = NULL;
+            d_C = NULL;
+        }
     }
     if(resultFile != NULL){
         fclose(resultFile);
@@ -264,20 +290,38 @@ int main(int argc, char **argv){
     }
 
     // Stampa dei risultati
-    printf("\n\nTempo di esecuzione [cuBLAS] [size: %d]: %f ms\n", cublasMillis, N);
+    printf("Tempo di esecuzione [cuBLAS] [size: %d]: %f ms\n", cublasMillis, N);
     printf("TFLOPS [cuBLAS] [size: %d]: %f\n", cublasTFLOPS, N);
     
     //Libero la memoria delle matrici sorgenti
-    cudaFree(d_A);
-    cudaFree(d_B);
+    if(err1 == cudaSuccess && err2 == cudaSuccess){
+        cudaFree(d_A);
+        cudaFree(d_B);
+        d_A = NULL;
+        d_B = NULL;
+    }
 
 
     /////// Custom Kernel ///////
+    half* d_A_half = NULL;
+    half* d_B_half = NULL;
+    
+    // Allocazione delle matrici sul device e conversione in half
+    printf("[INFO]: Allocazione delle matrici half A e B sulla GPU\n");
+    err1 = convertFloatToHalf(h_A, &d_A_half, N);
+    err2 = convertFloatToHalf(h_B, &d_B_half, N);
+    if(err1 != cudaSuccess || err2 != cudaSuccess){
+        printf("[ERR]: Errore nell'allocazione e conversione delle matrici in half\n");
+        d_A_half = NULL;
+        d_B_half = NULL;
+    }else{
+        printf("[INFO]: Allocazione delle matrici half A e B sulla GPU completata\n");
+    }
     // Moltiplicazione di matrici con kernel custom
 #ifdef WMMA_BATCHED
-    tensorCoreMatMul(h_A, h_B, d_C, N, BS, &myMillis, &myTFLOPS);
+    tensorCoreMatMul(d_A_half, d_B_half, d_C, N, BS, &myMillis, &myTFLOPS);
 #else
-    tensorCoreMatMul(h_A, h_B, d_C, N, &myMillis, &myTFLOPS);
+    tensorCoreMatMul(d_A_half, d_B_half, d_C, N, &myMillis, &myTFLOPS);
 #endif
     // Copia dei risultati dalla GPU all'host
     checkCudaError(cudaMemcpy(h_C_wmma, d_C, matrix_size, cudaMemcpyDeviceToHost), "Copia matrice C dal device");
@@ -315,13 +359,27 @@ int main(int argc, char **argv){
 
 
     // Libera la memoria sull'host
-    free(h_A);
-    free(h_B);
-    free(h_C_cublas);
-    free(h_C_wmma);
+    if(h_A != NULL && h_B != NULL && h_C_cublas != NULL && h_C_wmma != NULL){
+        free(h_A);
+        free(h_B);
+        free(h_C_cublas);
+        free(h_C_wmma);
+
+        h_A = NULL;
+        h_B = NULL;
+        h_C_cublas = NULL;
+        h_C_wmma = NULL;
+    }
 
     // Libera la memoria sulla GPU
-    cudaFree(d_C);
+    if(err1 == cudaSuccess && err2 == cudaSuccess && err3 == cudaSuccess){
+        cudaFree(d_A_half);
+        cudaFree(d_B_half);
+        cudaFree(d_C);
+        d_A_half = NULL;
+        d_B_half = NULL;
+        d_C = NULL;
+    }
 }
 
 #endif

@@ -195,11 +195,30 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_
 }
 #endif // WMMA_BATCHED
 
+cudaError_t convertFloatToHalf(const float *A, half **B, int N){
+    half* h_B = (half*)malloc(N * N * sizeof(half));
+    if(B == NULL){
+        printf("[ERROR]: unable to convert float to half caused by B NULL pointer\n");
+        return cudaErrorInvalidValue;
+    }
+    cudaError_t err = cudaMalloc((void **)B, N * N * sizeof(half));
+    if(h_B != NULL && err == cudaSuccess){
+        for(int i = 0; i < N * N; ++i){
+            h_B[i] = __float2half(A[i]);
+        }
+        err = cudaMemcpy(*B, h_B, N * N * sizeof(half), cudaMemcpyHostToDevice);
+        free(h_B);
+    }else{
+        printf("[ERROR]: unable to allocate memory for half matrix\n");
+    }
+    return err;
+}
+
 // Funzione per la moltiplicazione di matrici su GPU con Tensor Cores e WMMA
 #ifndef WMMA_BATCHED
-void tensorCoreMatMul(const float *h_A, const float *h_B, float *d_C, int n, float* milliseconds, double* TFLOPS) {
+void tensorCoreMatMul(const half *d_A, const half *d_B, float *d_C, int n, float* milliseconds, double* TFLOPS) {
     
-    if(h_A == NULL || h_B == NULL || d_C == NULL){
+    if(d_A == NULL || d_B == NULL || d_C == NULL){
         printf("[ERROR]: unable to perform MatMul caused by NULL pointers\n");
         if(milliseconds != NULL && TFLOPS != NULL){
             *milliseconds = -1;
@@ -207,43 +226,7 @@ void tensorCoreMatMul(const float *h_A, const float *h_B, float *d_C, int n, flo
         }
         return;
     }
-    
-    // Allocazione delle matrici A e B sul device
-    int device_matrix_size = n * n * sizeof(half);
-    half *A = NULL;
-    half *B = NULL; 
-    half *h_Ahalf = NULL; 
-    half *h_Bhalf = NULL;
-    
-    //Allocazione delle matrici sull'host
-    printf("[INFO]: Allocazione delle matrici half A e B sull'host\n");
-    h_Ahalf = (half *)malloc(device_matrix_size);
-    h_Bhalf = (half *)malloc(device_matrix_size);
-    printf("[INFO]: Allocazione delle matrici half A e B sull'host completata\n");
 
-    //Allocazione delle matrici sul device
-    printf("[INFO]: Allocazione delle matrici half A e B sulla GPU\n");
-    cudaError_t err1 = checkCudaError(cudaMalloc((void **)&A, device_matrix_size), "Allocazione matrice A su GPU");
-    cudaError_t err2 = checkCudaError(cudaMalloc((void **)&B, device_matrix_size), "Allocazione matrice B su GPU");
-    printf("[INFO]: Allocazione delle matrici half A e B sulla GPU completata\n");
-    
-    //Conversione delle matrici in half
-    if( h_Ahalf != NULL && h_Bhalf != NULL && err1 == cudaSuccess && err2 == cudaSuccess){
-        for(int i = 0; i < n * n; ++i){
-            h_Ahalf[i] = __float2half(h_A[i]);
-            h_Bhalf[i] = __float2half(h_B[i]);
-        }
-        checkCudaError(cudaMemcpy(A, h_Ahalf, device_matrix_size, cudaMemcpyHostToDevice), "Copia matrice A sulla GPU");
-        checkCudaError(cudaMemcpy(B, h_Bhalf, device_matrix_size, cudaMemcpyHostToDevice), "Copia matrice B sulla GPU");
-
-    }else{
-        printf("[ERROR]: unable to perform MatMul caused by NULL pointers\n");
-        if(milliseconds != NULL && TFLOPS != NULL){
-            *milliseconds = -1;
-            *TFLOPS = -1;
-        }
-        return;
-    }
     // Configura la griglia e i blocchi per la computazione
     dim3 threadsPerBlock(32, 32);
     dim3 numBlocks(n / TILE_SIZE, n / TILE_SIZE);
@@ -257,7 +240,7 @@ void tensorCoreMatMul(const float *h_A, const float *h_B, float *d_C, int n, flo
     cudaEventRecord(start, 0);
     
     // Esegui il kernel per la moltiplicazione di matrici con Tensor Cores e WMMA
-    matrixMultiplyTensorCore<<<numBlocks, threadsPerBlock>>>(A, B, d_C, n);
+    matrixMultiplyTensorCore<<<numBlocks, threadsPerBlock>>>(d_A, d_B, d_C, n);
     
     // Ferma il timer
     cudaEventRecord(stop, 0);
@@ -278,19 +261,11 @@ void tensorCoreMatMul(const float *h_A, const float *h_B, float *d_C, int n, flo
     }else{
         printf("some pointers are NULL\n");
     }
-
-    // Libera la memoria sul device
-    cudaFree(A);
-    cudaFree(B);
-
-    // Libera la memoria sull'host
-    free(h_Ahalf);
-    free(h_Bhalf);
 }
 #else
-void tensorCoreMatMul(const float *h_A, const float *h_B, float *d_C, int n, int bs, float* milliseconds, double* TFLOPS) {
+void tensorCoreMatMul(const half *d_A, const half *d_B, float *d_C, int n, int bs, float* milliseconds, double* TFLOPS) {
     
-    if(h_A == NULL || h_B == NULL || d_C == NULL){
+    if(d_A == NULL || d_B == NULL || d_C == NULL){
         printf("[ERROR]: unable to perform MatMul caused by NULL pointers\n");
         if(milliseconds != NULL && TFLOPS != NULL){
             *milliseconds = -1;
@@ -298,44 +273,7 @@ void tensorCoreMatMul(const float *h_A, const float *h_B, float *d_C, int n, int
         }
         return;
     }
-    
-    // Allocazione delle matrici A e B sul device
-    int device_matrix_size = n * n * sizeof(half);
-    half *A = NULL;
-    half *B = NULL; 
-    half *h_Ahalf = NULL; 
-    half *h_Bhalf = NULL;
-    
-    //Allocazione delle matrici sull'host
-    printf("[INFO]: Allocazione delle matrici half A e B sull'host\n");
-    h_Ahalf = (half *)malloc(device_matrix_size);
-    h_Bhalf = (half *)malloc(device_matrix_size);
-    printf("[INFO]: Allocazione delle matrici half A e B sull'host completata\n");
 
-    //Allocazione delle matrici sul device
-    printf("[INFO]: Allocazione delle matrici half A e B sulla GPU\n");
-    cudaError_t err1 = checkCudaError(cudaMalloc((void **)&A, device_matrix_size), "Allocazione matrice A (half) su GPU");
-    cudaError_t err2 = checkCudaError(cudaMalloc((void **)&B, device_matrix_size), "Allocazione matrice B (half) su GPU");
-    
-    //Conversione delle matrici in half
-    if( h_Ahalf != NULL && h_Bhalf != NULL && err1 == cudaSuccess && err2 == cudaSuccess){
-        printf("[INFO]: Allocazione delle matrici half A e B sulla GPU completata\n");
-        printf("[INFO]: Conversione delle matrici A e B in half\n");
-        for(int i = 0; i < n * n; ++i){
-            h_Ahalf[i] = __float2half(h_A[i]);
-            h_Bhalf[i] = __float2half(h_B[i]);
-        }
-        checkCudaError(cudaMemcpy(A, h_Ahalf, device_matrix_size, cudaMemcpyHostToDevice), "Copia matrice A sulla GPU");
-        checkCudaError(cudaMemcpy(B, h_Bhalf, device_matrix_size, cudaMemcpyHostToDevice), "Copia matrice B sulla GPU");
-
-    }else{
-        printf("[ERROR]: unable to perform MatMul caused by NULL pointers\n");
-        if(milliseconds != NULL && TFLOPS != NULL){
-            *milliseconds = -1;
-            *TFLOPS = -1;
-        }
-        return;
-    }
     // Configura la griglia e i blocchi per la computazione
     dim3 threadsPerBlock(32);
     dim3 numBlocks(n / bs, n / bs);
@@ -349,8 +287,8 @@ void tensorCoreMatMul(const float *h_A, const float *h_B, float *d_C, int n, int
     cudaEventRecord(start, 0);
     
     // Esegui il kernel per la moltiplicazione di matrici con Tensor Cores e WMMA
-    matrixMultiplyTensorCore<<<numBlocks, threadsPerBlock>>>(A, B, d_C, n, bs);
-    // matrixMultiplyTensorCore<<<numBlocks, 1>>>(A, B, d_C, n, bs);
+    matrixMultiplyTensorCore<<<numBlocks, threadsPerBlock>>>(d_A, d_B, d_C, n, bs);
+    // matrixMultiplyTensorCore<<<numBlocks, 1>>>(d_A, d_B, d_C, n, bs);
     
     // Ferma il timer
     cudaEventRecord(stop, 0);
@@ -369,16 +307,7 @@ void tensorCoreMatMul(const float *h_A, const float *h_B, float *d_C, int n, int
     if(milliseconds != NULL && TFLOPS != NULL){
         *TFLOPS = (FLOPs / (*milliseconds / 1000.0)) / 1e12;
     }else{
-        printf("some pointers are NULL\n");
+        printf("[ERROR]: some pointers are NULL\n");
     }
-
-    // Libera la memoria sul device
-    cudaFree(A);
-    cudaFree(B);
-
-    // Libera la memoria sull'host
-    free(h_Ahalf);
-    free(h_Bhalf);
-
 }
 #endif // WMMA_BATCHED
