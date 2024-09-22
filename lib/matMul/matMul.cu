@@ -142,8 +142,8 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_
     // wmma::fragment<wmma::accumulator, WMMA_N, WMMA_N, WMMA_N, float> c_frag;
 
     //Coordinate di blocco
-    int bRow = blockIdx.y * blockDim.y;
-    int bCol = blockIdx.x * blockDim.x;
+    int bRow = blockIdx.y; // * blockDim.y;
+    int bCol = blockIdx.x; // * blockDim.x;
 
     //Numero di blocchi
     int numBlocks = n / bs;
@@ -151,6 +151,7 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_
     //Coordinate di partenza del blocco in C
     int cStartingRow = bRow * n * bs;
     int cStartingCol = bCol * bs;
+    
     //Moltiplico i blocchi BSxBS tra di loro
     for(int k = 0; k < numBlocks; ++k){
         //extern __shared__ float c_temp[];
