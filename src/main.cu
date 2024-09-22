@@ -210,7 +210,7 @@ int main(int argc, char **argv) {
 }
 #else
 
-#define N 128
+#define N 1024
 #define BS 64
 
 #warning "Testing mode"
