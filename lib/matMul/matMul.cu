@@ -12,6 +12,8 @@ using namespace nvcuda;
     #define TILE_SIZE 16
 #endif
 
+#define BLOCK_SIZE 32
+
 #ifndef THREADS_PER_BLOCK
     #define THREADS_PER_BLOCK 32
 #endif
@@ -130,49 +132,71 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *c,
 #else
 #define WMMA_N 16
 
-__device__ void blockMatrixMul(const half *a, const half *b, float *c, int blockRow, int blockCol, int blockK, int n, int bs){
+
+/**! 
+    @brief Funzione per la moltiplicazione di blocchi BLOCK_SIZE x BLOCK_SIZE
+    @details La funzione prende in ingresso i puntatori alle matrici e moltiplica i due blocchi 
+    @param a [in] puntatore alla matrice A in shared memory
+    @param b [in] puntatore alla matrice B in shared memory
+    @param c [out] puntatore alla matrice C in shared memory
+    @param n dimensione delle matrici
+*/
+__device__ void blockMatrixMul(const half *a, const half *b, float *c, int n){
     
     //Creazione dei fragment
     wmma::fragment<wmma::matrix_a, WMMA_N, WMMA_N, WMMA_N, half, wmma::row_major> a_frag;
     wmma::fragment<wmma::matrix_b, WMMA_N, WMMA_N, WMMA_N, half, wmma::row_major> b_frag;
     wmma::fragment<wmma::accumulator, WMMA_N, WMMA_N, WMMA_N, float> acc_frag;
     
-    int numWmmaBlocks = bs / WMMA_N; // quante operazioni WMMA devo fare per completare il task?
+    // Carica i fragment
+    wmma::load_matrix_sync(a_frag,   a + threadIdx.x, BLOCK_SIZE);
+    wmma::load_matrix_sync(b_frag,   b + threadIdx.x, BLOCK_SIZE);
+    wmma::load_matrix_sync(acc_frag, c + threadIdx.x, BLOCK_SIZE, wmma::mem_row_major);
 
-    int iterations = (bs * bs) / (THREADS_PER_BLOCK * THREADS_PER_BLOCK);
+    // Moltiplica i fragment
+    wmma::mma_sync(acc_frag, a_frag, b_frag, acc_frag);
 
-    for(int iteration = 0; iteration < iterations; iteration++){
-        // 
-        int threadID = threadIdx.x + (iteration * THREADS_PER_BLOCK * THREADS_PER_BLOCK);
-        int colInsideBlock = threadID % bs;
-        int rowInsideBlock = threadID / bs * n;
-        int blockColOffset = blockCol * bs;
-        int blockRowOffset = blockRow * bs * n;
-
-        int cCol = colInsideBlock + blockColOffset;
-        int cRow = rowInsideBlock + blockRowOffset;
-        
-
-    }
-
+    // Memorizza il risultato
+    wmma::store_matrix_sync(c, acc_frag, n, wmma::mem_row_major);
 }
 
-__global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_c, int n, int bs) {
+
+__global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_c, int n) {
     //TODO: Implementare la gestione della shared memory
+#ifdef TESTING_WMMA
+    __shared__ half As [BLOCK_SIZE * BLOCK_SIZE];
+    __shared__ half Bs [BLOCK_SIZE * BLOCK_SIZE];
 
+    //Copy data to shared memory
+    As[threadIdx.x] = a[threadIdx.x];
+    Bs[threadIdx.x] = b[threadIdx.x];
 
-    
-    int numBlocks = n / bs;
+    blockMatrixMul(As, Bs, d_c, n);
+
+    //Copy data to global memory
+    a[threadIdx.x] = As[threadIdx.x];
+    b[threadIdx.x] = Bs[threadIdx.x];
+#else
+    int numBlocks = n / BLOCK_SIZE;
     int blockRow = blockIdx.y;
     int blockCol = blockIdx.x;
 
     for(int k = 0; k < numBlocks; ++k){
         // Moltiplica ed accumula i blocchi in C, 
         //   k fa muovere il blocco lungo le colonne di A e le righe di B
-        blockMatrixMul(a, b, c, blockRow, blockCol, k, n, bs);
+            // 
+                // int threadID = threadIdx.x;
+                // int colInsideBlock = threadID % BLOCK_SIZE;
+                // int rowInsideBlock = threadID / BLOCK_SIZE * n;
+                // int blockColOffset = blockCol * BLOCK_SIZE;
+                // int blockRowOffset = blockRow * BLOCK_SIZE * n;
+
+                // int cElement = colInsideBlock + blockColOffset + rowInsideBlock + blockRowOffset;
+        blockMatrixMul(a, b, c, n);
 
         //l'accumulo credo lo si possa fare nel fragment caricandolo con C e non con 0, ammesso che C sia inizializzato a 0
     }
+#endif
 }
 #endif // WMMA_BATCHED
 
@@ -244,7 +268,7 @@ void tensorCoreMatMul(const half *d_A, const half *d_B, float *d_C, int n, float
     }
 }
 #else
-void tensorCoreMatMul(const half *d_A, const half *d_B, float *d_C, int n, int bs, float* milliseconds, double* TFLOPS) {
+void tensorCoreMatMul(const half *d_A, const half *d_B, float *d_C, int n, float* milliseconds, double* TFLOPS) {
     
     if(d_A == NULL || d_B == NULL || d_C == NULL){
         printf("[ERROR]: unable to perform MatMul caused by NULL pointers\n");
@@ -257,7 +281,7 @@ void tensorCoreMatMul(const half *d_A, const half *d_B, float *d_C, int n, int b
 
     // Configura la griglia e i blocchi per la computazione
     dim3 threadsPerBlock(THREADS_PER_BLOCK * THREADS_PER_BLOCK);
-    dim3 numBlocks(n / bs, n / bs);
+    dim3 numBlocks(n / BLOCK_SIZE, n / BLOCK_SIZE);
 
     // Misurazione del tempo
     cudaEvent_t start, stop;
@@ -268,7 +292,7 @@ void tensorCoreMatMul(const half *d_A, const half *d_B, float *d_C, int n, int b
     cudaEventRecord(start, 0);
     
     // Esegui il kernel per la moltiplicazione di matrici con Tensor Cores e WMMA
-    matrixMultiplyTensorCore<<<numBlocks, threadsPerBlock>>>(d_A, d_B, d_C, n, bs);
+    matrixMultiplyTensorCore<<<numBlocks, threadsPerBlock>>>(d_A, d_B, d_C, n);
     
     // Ferma il timer
     cudaEventRecord(stop, 0);

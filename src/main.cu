@@ -212,8 +212,7 @@ int main(int argc, char **argv) {
 }
 #else
 
-#define N 1024
-#define BS 64
+#define N 32
 
 #warning "Testing mode"
 
@@ -320,11 +319,8 @@ int main(int argc, char **argv){
         printf("[INFO]: Allocazione delle matrici half A e B sulla GPU completata\n");
     }
     // Moltiplicazione di matrici con kernel custom
-#ifdef WMMA_BATCHED
-    tensorCoreMatMul(d_A_half, d_B_half, d_C, N, BS, &myMillis, &myTFLOPS);
-#else
     tensorCoreMatMul(d_A_half, d_B_half, d_C, N, &myMillis, &myTFLOPS);
-#endif
+
     // Copia dei risultati dalla GPU all'host
     checkCudaError(cudaMemcpy(h_C_wmma, d_C, matrix_size, cudaMemcpyDeviceToHost), "Copia matrice C dal device");
     //Stampa delle matrici

@@ -79,12 +79,11 @@ cudaError_t convertFloatToHalf(const float *A, half **B, int N);
     @param      milliseconds[out] Time taken to perform the matrix multiplication
     @param      TFLOPS[out] Theoretical peak FLOPS achieved during the matrix multiplication
     @param      bs[in] Size of the block to be used for matrix multiplication
-    @note       The 'bs' parameter is only used when WMMA_BATCHED is defined
 */
 #ifndef WMMA_BATCHED
     void tensorCoreMatMul(const half *d_A, const half *d_B, float *d_C, int N, float* milliseconds, double* TFLOPS);
 #else
-    void tensorCoreMatMul(const half *d_A, const half *d_B, float *d_C, int N, int bs, float* milliseconds, double* TFLOPS);
+    void tensorCoreMatMul(const half *d_A, const half *d_B, float *d_C, int N, float* milliseconds, double* TFLOPS);
 #endif
 
 #endif // MATMUL_H
