@@ -149,33 +149,30 @@ __device__ void blockMatrixMul(const half *a, const half *b, float *c, int n){
     wmma::fragment<wmma::accumulator, WMMA_N, WMMA_N, WMMA_N, float> acc_frag;
     
     // Carica i fragment
-    wmma::load_matrix_sync(a_frag,   a + threadIdx.x, BLOCK_SIZE);
-    wmma::load_matrix_sync(b_frag,   b + threadIdx.x, BLOCK_SIZE);
-    wmma::load_matrix_sync(acc_frag, c + threadIdx.x, BLOCK_SIZE, wmma::mem_row_major);
+    wmma::load_matrix_sync(a_frag,   a, BLOCK_SIZE);
+    wmma::load_matrix_sync(b_frag,   b, BLOCK_SIZE);
+    wmma::load_matrix_sync(acc_frag, c, BLOCK_SIZE, wmma::mem_row_major);
 
     // Moltiplica i fragment
     wmma::mma_sync(acc_frag, a_frag, b_frag, acc_frag);
 
     // Memorizza il risultato
-    wmma::store_matrix_sync(c, acc_frag, n, wmma::mem_row_major);
+    wmma::store_matrix_sync(c, acc_frag, BLOCK_SIZE, wmma::mem_row_major);
 }
 
 
 __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_c, int n) {
     //TODO: Implementare la gestione della shared memory
 #ifdef TESTING_WMMA
-    __shared__ half As [BLOCK_SIZE * BLOCK_SIZE];
-    __shared__ half Bs [BLOCK_SIZE * BLOCK_SIZE];
+    // __shared__ half As [BLOCK_SIZE * BLOCK_SIZE];
+    // __shared__ half Bs [BLOCK_SIZE * BLOCK_SIZE];
 
-    //Copy data to shared memory
-    As[threadIdx.x] = a[threadIdx.x];
-    Bs[threadIdx.x] = b[threadIdx.x];
+    // //Copy data to shared memory
+    // As[threadIdx.x] = a[threadIdx.x];
+    // Bs[threadIdx.x] = b[threadIdx.x];
 
-    blockMatrixMul(As, Bs, d_c, n);
+    blockMatrixMul(a, b, d_c, n);
 
-    //Copy data to global memory
-    a[threadIdx.x] = As[threadIdx.x];
-    b[threadIdx.x] = Bs[threadIdx.x];
 #else
     int numBlocks = n / BLOCK_SIZE;
     int blockRow = blockIdx.y;
