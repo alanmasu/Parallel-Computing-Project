@@ -86,6 +86,7 @@ int main(int argc, char **argv) {
         for (int i = 0; i < N * N; ++i) {
             h_A[i] = static_cast<float>(rand()) / RAND_MAX;
             h_B[i] = static_cast<float>(rand()) / RAND_MAX;
+            h_C[i] = 0;
             // h_A[i] = i;
             // h_B[i] = i;
         }
@@ -102,6 +103,7 @@ int main(int argc, char **argv) {
         if(err1 == cudaSuccess && err2 == cudaSuccess && err3 == cudaSuccess){
             checkCudaError(cudaMemcpy(d_A, h_A, matrix_size, cudaMemcpyHostToDevice), "Copia matrice A sulla GPU");
             checkCudaError(cudaMemcpy(d_B, h_B, matrix_size, cudaMemcpyHostToDevice), "Copia matrice B sulla GPU");
+            checkCudaError(cudaMemcpy(d_C, h_C, matrix_size, cudaMemcpyHostToDevice), "Copia matrice C sulla GPU");
         }
         //Indicatori di performance
         float cublasMillis = 0;
