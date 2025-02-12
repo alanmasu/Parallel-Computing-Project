@@ -18,6 +18,7 @@ using namespace nvcuda;
     #define THREADS_PER_BLOCK 32
 #endif
 
+#define SHARED_PAGE_COUNT 8
 
 void serialMatMul(const float *A, const float *B, float *C, int N){
     for(int r = 0; r < N; ++r){
@@ -164,13 +165,13 @@ __device__ void blockMatrixMul(const half *a, const half *b, float *c, int n){
 __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_c, int n) {
     //TODO: Implementare la gestione della shared memory
 #ifdef TESTING_WMMA
-    __shared__ half As [BLOCK_SIZE * BLOCK_SIZE];
-    __shared__ half Bs [BLOCK_SIZE * BLOCK_SIZE];
+    __shared__ half  As [SHARED_PAGE_COUNT * BLOCK_SIZE * BLOCK_SIZE];
+    __shared__ half  Bs [SHARED_PAGE_COUNT * BLOCK_SIZE * BLOCK_SIZE];
 
     //Copy data to shared memory
     As[threadIdx.x] = a[threadIdx.x];
     Bs[threadIdx.x] = b[threadIdx.x];
-    
+
     blockMatrixMul(As, Bs, d_c, n);
 #else
     int numBlocks = n / BLOCK_SIZE;
