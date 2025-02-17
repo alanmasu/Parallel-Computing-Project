@@ -212,8 +212,7 @@ int main(int argc, char **argv) {
 }
 #else
 
-#define N 32
-
+#define N 512
 #warning "Testing mode"
 
 int main(int argc, char **argv){

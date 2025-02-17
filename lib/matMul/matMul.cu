@@ -18,7 +18,7 @@ using namespace nvcuda;
     #define THREADS_PER_BLOCK 32
 #endif
 
-#define SHARED_PAGE_COUNT 8
+#define SHARED_PAGE_COUNT 4
 
 void serialMatMul(const float *A, const float *B, float *C, int N){
     for(int r = 0; r < N; ++r){
@@ -161,12 +161,45 @@ __device__ void blockMatrixMul(const half *a, const half *b, float *c, int n){
     wmma::store_matrix_sync(c, acc_frag, BLOCK_SIZE, wmma::mem_row_major);
 }
 
+/**! 
+    @brief Funzione per il caricamento di un blocco di matrice in shared memory
+
+*/
+template <typename T>
+__device__ void loadBlockToShared(const T *a, T *As, int r, int c, int n){
+    int threadID = threadIdx.x;
+    int colInsideBlock = threadID % BLOCK_SIZE;
+    int rowInsideBlock = threadID / BLOCK_SIZE * n;
+    int blockColOffset = c * BLOCK_SIZE;
+    int blockRowOffset = r * BLOCK_SIZE * n;
+    int element = colInsideBlock + blockColOffset + rowInsideBlock + blockRowOffset;
+    if(element < n * n){
+        As[threadID] = a[element];
+    }
+}
+
+/**! 
+    @brief Funzione per copiare un blocco di matrice in global memory
+
+*/
+template <typename T>
+__device__ void copyBlockToGlobal(const T *As, T *a, int r, int c, int n){
+    int threadID = threadIdx.x;
+    int colInsideBlock = threadID % BLOCK_SIZE;
+    int rowInsideBlock = threadID / BLOCK_SIZE * n;
+    int blockColOffset = c * BLOCK_SIZE;
+    int blockRowOffset = r * BLOCK_SIZE * n;
+    int element = colInsideBlock + blockColOffset + rowInsideBlock + blockRowOffset;
+    if(element < n * n){
+        a[element] = As[threadID];
+    }
+}
 
 __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_c, int n) {
-    //TODO: Implementare la gestione della shared memory
 #ifdef TESTING_WMMA
     __shared__ half  As [SHARED_PAGE_COUNT * BLOCK_SIZE * BLOCK_SIZE];
     __shared__ half  Bs [SHARED_PAGE_COUNT * BLOCK_SIZE * BLOCK_SIZE];
+    __shared__ half  Cs [SHARED_PAGE_COUNT * BLOCK_SIZE * BLOCK_SIZE];
 
     //Copy data to shared memory
     As[threadIdx.x] = a[threadIdx.x];
@@ -174,24 +207,26 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_
 
     blockMatrixMul(As, Bs, d_c, n);
 #else
-    int numBlocks = n / BLOCK_SIZE;
+    __shared__ half  As [SHARED_PAGE_COUNT * BLOCK_SIZE * BLOCK_SIZE];
+    __shared__ half  Bs [SHARED_PAGE_COUNT * BLOCK_SIZE * BLOCK_SIZE];
+    __shared__ float  Cs [SHARED_PAGE_COUNT * BLOCK_SIZE * BLOCK_SIZE];
+
+    int numPages = n / (SHARED_PAGE_COUNT * 32);                        // 32 è il numero di elementi per pagina di shared memory
+    int numBlocks = numPages < 1 ? n / BLOCK_SIZE : SHARED_PAGE_COUNT;  // Se la matrice è piccola non tutti i blocchi di shared memory sono utilizzati
     int blockRow = blockIdx.y;
     int blockCol = blockIdx.x;
 
-    for(int k = 0; k < numBlocks; ++k){
-        // Moltiplica ed accumula i blocchi in C, 
-        //   k fa muovere il blocco lungo le colonne di A e le righe di B
-            // 
-                // int threadID = threadIdx.x;
-                // int colInsideBlock = threadID % BLOCK_SIZE;
-                // int rowInsideBlock = threadID / BLOCK_SIZE * n;
-                // int blockColOffset = blockCol * BLOCK_SIZE;
-                // int blockRowOffset = blockRow * BLOCK_SIZE * n;
-
-                // int cElement = colInsideBlock + blockColOffset + rowInsideBlock + blockRowOffset;
-        blockMatrixMul(a, b, c, n);
-
-        //l'accumulo credo lo si possa fare nel fragment caricandolo con C e non con 0, ammesso che C sia inizializzato a 0
+    for(int p = 0; p < numPages; ++p){
+        // Carica la riga di blocchi della matrice A in shared memory
+        int pageOffset = p * SHARED_PAGE_COUNT * BLOCK_SIZE * n;
+        loadBlockToShared(a, As, pageOffset, blockRow, n);  
+        loadBlockToShared(d_c, Cs, pageOffset, blockRow, n); 
+        for(int k = 0; k < numBlocks; ++k){
+            // Carica i blocchi in shared memory
+            loadBlockToShared(b, Bs, blockCol, k, n);
+            blockMatrixMul(As, Bs, Cs, n);
+        }
+        copyBlockToGlobal(Cs, d_c, pageOffset, blockRow, n);
     }
 #endif
 }
