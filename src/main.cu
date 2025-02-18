@@ -5,27 +5,8 @@
 #include <cublas_v2.h>
 #include <matMul.h>
 #include <ctime>
+#include <Utilities.h>
 
-
-
-// Funzione per la stampa di matrici
-void printMat(float *mat, int rows, int cols) {
-    for (int i = 0; i < rows; ++i) {
-        for (int j = 0; j < cols; ++j) {
-            printf("%f ", mat[i * cols + j]);
-        }
-        printf("\n");
-    }
-}
-
-void printNMat(float *mat, int rows, int cols, int N) {
-    for (int i = 0; i < rows; ++i) {
-        for (int j = 0; j < cols; ++j) {
-            printf("%f ", mat[i * N + j]);
-        }
-        printf("\n");
-    }
-}
 
 #ifndef TESTING
 int main(int argc, char **argv) {
@@ -212,7 +193,14 @@ int main(int argc, char **argv) {
 }
 #else
 
-#define N 512
+#ifdef TESTING_WMMA
+  #define N 32
+#endif
+
+#ifndef N
+  #define N 512
+#endif
+
 #warning "Testing mode"
 
 int main(int argc, char **argv){
@@ -317,6 +305,10 @@ int main(int argc, char **argv){
     }else{
         printf("[INFO]: Allocazione delle matrici half A e B sulla GPU completata\n");
     }
+
+    //Azzeramento matrice C
+    checkCudaError(cudaMemcpy(d_C, h_C_wmma, matrix_size, cudaMemcpyHostToDevice), "Copia matrice C sulla GPU");
+
     // Moltiplicazione di matrici con kernel custom
     tensorCoreMatMul(d_A_half, d_B_half, d_C, N, &myMillis, &myTFLOPS);
 

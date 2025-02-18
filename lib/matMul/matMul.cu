@@ -4,6 +4,8 @@
 #include <iostream>
 #include <cstdlib>
 #include <mma.h>
+#include <Utilities.h>
+
 
 using namespace nvcuda;
 
@@ -27,6 +29,17 @@ void serialMatMul(const float *A, const float *B, float *C, int N){
                 C[r * N + c] += A[r * N + k] * B[k * N + c];
             }
         }
+    }
+}
+
+//Funzione di stampa, oveloaded from template function for half type
+__host__ __device__ void printNMat(const half* mat, int rows, int cols, int N) {
+    printf("Printing half matrix\n");
+    for (int i = 0; i < rows; ++i) {
+        for (int j = 0; j < cols; ++j) {
+            printf("%f ", __half2float(mat[i * N + j]));
+        }
+        printf("\n");
     }
 }
 
@@ -161,6 +174,27 @@ __device__ void blockMatrixMul(const half *a, const half *b, float *c, int n){
     wmma::store_matrix_sync(c, acc_frag, BLOCK_SIZE, wmma::mem_row_major);
 }
 
+__device__ void wmmaMatrixMultiply(const half *As, const half *Bs, float *Cs, int N){
+    int warpId = threadIdx.x / 32;  // Warp ID nel blocco
+    int laneId = threadIdx.x % 32;  // Lane ID nel warp
+
+    int row = (warpId / 2) * 16;  // Calcolo della riga del frammento
+    int col = (warpId % 2) * 16;  // Calcolo della colonna del frammento
+
+    // Controllo che l'accesso sia nei bound della matrice N×N
+    if (row < N && col < N) {
+        wmma::fragment<wmma::matrix_a, 16, 16, 16, half, wmma::row_major> fragA;
+        wmma::fragment<wmma::matrix_b, 16, 16, 16, half, wmma::col_major> fragB;
+        wmma::fragment<wmma::accumulator, 16, 16, 16, float> fragC;
+
+        wmma::fill_fragment(fragC, 0.0f);
+        wmma::load_matrix_sync(fragA, As + row * N + col, N);
+        wmma::load_matrix_sync(fragB, Bs + row * N + col, N);
+        wmma::mma_sync(fragC, fragA, fragB, fragC);
+        wmma::store_matrix_sync(Cs + row * N + col, fragC, N, wmma::mem_row_major);
+    }
+}
+
 /**! 
     @brief Funzione per il caricamento di un blocco di matrice in shared memory
 
@@ -199,13 +233,38 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_
 #ifdef TESTING_WMMA
     __shared__ half  As [SHARED_PAGE_COUNT * BLOCK_SIZE * BLOCK_SIZE];
     __shared__ half  Bs [SHARED_PAGE_COUNT * BLOCK_SIZE * BLOCK_SIZE];
-    __shared__ half  Cs [SHARED_PAGE_COUNT * BLOCK_SIZE * BLOCK_SIZE];
+    __shared__ float Cs [2 * BLOCK_SIZE * BLOCK_SIZE];
 
     //Copy data to shared memory
     As[threadIdx.x] = a[threadIdx.x];
     Bs[threadIdx.x] = b[threadIdx.x];
+    Cs[threadIdx.x] = 0;
+    // __syncthreads();
 
-    blockMatrixMul(As, Bs, d_c, n);
+    wmmaMatrixMultiply(As, Bs, Cs, n);
+    // blockMatrixMul(As, Bs, Cs, n);
+    // blockMatrixMul(a, b, d_c, n);
+    // copyBlockToGlobal(Cs, d_c, blockIdx.y, blockIdx.x, n);
+    if(blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0){
+        printf("Matrice As:\n");
+        printNMat(As, 4, 4, n);
+
+        printf("Matrice Bs:\n");
+        printNMat(Bs, 4, 4, n);
+
+        printf("Matrice Cs:\n");
+        printNMat(Cs, 4, 4, n);
+
+        // //Global memory
+        // printf("Matrice A:\n");
+        // printNMat(a, 4, 4, n);
+
+        // printf("Matrice B:\n");
+        // printNMat(b, 4, 4, n);
+
+        // printf("Matrice C:\n");
+        // printNMat(d_c, 4, 4, n);
+    }
 #else
     __shared__ half  As [SHARED_PAGE_COUNT * BLOCK_SIZE * BLOCK_SIZE];
     __shared__ half  Bs [SHARED_PAGE_COUNT * BLOCK_SIZE * BLOCK_SIZE];

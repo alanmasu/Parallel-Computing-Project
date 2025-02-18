@@ -86,4 +86,10 @@ cudaError_t convertFloatToHalf(const float *A, half **B, int N);
     void tensorCoreMatMul(const half *d_A, const half *d_B, float *d_C, int N, float* milliseconds, double* TFLOPS);
 #endif
 
+/*!
+    @brief      Function to print an half matrix
+    @details    This function prints a specified number of rows and culomns of an half matrix on the console 
+*/
+__host__ __device__ void printNMat(const half* mat, int rows, int cols, int N);
+
 #endif // MATMUL_H
