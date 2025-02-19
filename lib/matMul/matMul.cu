@@ -177,10 +177,12 @@ __device__ void blockMatrixMul(const half *a, const half *b, float *c, int n){
     int tileRow    = tileNumber / 2;    // Calcolo della riga del tile
     int tileCol    = tileNumber % 2;    // Calcolo della colonna del tile
 
+#ifdef PRINT_DEBUG
     if(laneId == 0){
         printf("Warp ID: %d, Block Number: %d, Tile Number: %d, Tile Page: %d, Tile Row: %d, Tile Col: %d\n", warpId, blockNumber, tileNumber, tilePage, tileRow, tileCol);
     }
-    
+#endif
+
     if(tileRow * WMMA_N < BLOCK_SIZE && tileCol * WMMA_N < BLOCK_SIZE && blockNumber == 0){
         int cRow = tileRow * WMMA_N * n;
         int cCol = tileCol * WMMA_N;
@@ -189,9 +191,12 @@ __device__ void blockMatrixMul(const half *a, const half *b, float *c, int n){
         int aCol = tilePage * WMMA_N;
         int bRow = tilePage * WMMA_N * n;
 
+#ifdef PRINT_DEBUG
+#warning "Debug print enabled"
         if(laneId == 0){
             printf("Warp %d is computing: c[%d][%d][%d] = a[%d][%d] * b[%d][%d]\n", warpId, cPage, cRow, cCol, cRow, aCol, bRow, cCol);
         }
+#endif
         // Carica i fragment
         wmma::load_matrix_sync(a_frag,   a + cRow + aCol, BLOCK_SIZE);
         wmma::load_matrix_sync(b_frag,   b + bRow + cCol, BLOCK_SIZE);
