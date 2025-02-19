@@ -20,7 +20,7 @@ using namespace nvcuda;
     #define THREADS_PER_BLOCK 32
 #endif
 
-#define SHARED_PAGE_COUNT 4
+#define SHARED_PAGE_COUNT 8
 
 void serialMatMul(const float *A, const float *B, float *C, int N){
     for(int r = 0; r < N; ++r){
@@ -162,21 +162,58 @@ __device__ void blockMatrixMul(const half *a, const half *b, float *c, int n){
     wmma::fragment<wmma::matrix_b, WMMA_N, WMMA_N, WMMA_N, half, wmma::row_major> b_frag;
     wmma::fragment<wmma::accumulator, WMMA_N, WMMA_N, WMMA_N, float> acc_frag;
     
-    // Carica i fragment
-    wmma::load_matrix_sync(a_frag,   a, BLOCK_SIZE);
-    wmma::load_matrix_sync(b_frag,   b, BLOCK_SIZE);
-    wmma::load_matrix_sync(acc_frag, c, BLOCK_SIZE, wmma::mem_row_major);
+    // Calcolo del warp ID e del lane ID
+    int warpId = threadIdx.x / 32;  // Warp ID nel blocco
+    int laneId = threadIdx.x % 32;  // Lane ID nel warp
+    
+    // // Calcolo del blocco
+    int blockNumber = warpId / 8;       // Siccome ogni blocco 32x32 richiede 8 WMMA, il blocco lo si ottine dividendo per 8 il warp ID
+    // int blockRow    = blockNumber / 2;  // Calcolo della riga del blocco
+    // int blockCol    = blockNumber % 2;  // Calcolo della colonna del blocco
 
-    // Moltiplica i fragment
-    wmma::mma_sync(acc_frag, a_frag, b_frag, acc_frag);
+    // Calcolo del tile
+    int tileNumber = warpId % 4;        // Calcolo del numero di tile, ad ogni warp è assegnato un tile, abbiamo 2 operazioni per tile e 4 tile, da qui l'esigenza di 8 warp
+    int tilePage   = (warpId % 8) / 4;  // Calcolo della pagina del tile, per ogni tile abbiamo bisogno di 2 computazioni; 
+    int tileRow    = tileNumber / 2;    // Calcolo della riga del tile
+    int tileCol    = tileNumber % 2;    // Calcolo della colonna del tile
 
-    // Memorizza il risultato
-    wmma::store_matrix_sync(c, acc_frag, BLOCK_SIZE, wmma::mem_row_major);
+#ifdef PRINT_DEBUG
+    if(laneId == 0){
+        printf("Warp ID: %d, Block Number: %d, Tile Number: %d, Tile Page: %d, Tile Row: %d, Tile Col: %d\n", warpId, blockNumber, tileNumber, tilePage, tileRow, tileCol);
+    }
+#endif
+
+    if(tileRow * WMMA_N < BLOCK_SIZE && tileCol * WMMA_N < BLOCK_SIZE && blockNumber == 0){
+        int cRow = tileRow * WMMA_N * n;
+        int cCol = tileCol * WMMA_N;
+        int cPage = tilePage * BLOCK_SIZE * BLOCK_SIZE;
+
+        int aCol = tilePage * WMMA_N;
+        int bRow = tilePage * WMMA_N * n;
+
+#ifdef PRINT_DEBUG
+#warning "Debug print enabled"
+        if(laneId == 0){
+            printf("Warp %d is computing: c[%d][%d][%d] = a[%d][%d] * b[%d][%d]\n", warpId, cPage, cRow, cCol, cRow, aCol, bRow, cCol);
+        }
+#endif
+        // Carica i fragment
+        wmma::load_matrix_sync(a_frag,   a + cRow + aCol, BLOCK_SIZE);
+        wmma::load_matrix_sync(b_frag,   b + bRow + cCol, BLOCK_SIZE);
+        // wmma::load_matrix_sync(acc_frag, c + cRow + cCol, BLOCK_SIZE, wmma::mem_row_major);
+        wmma::fill_fragment(acc_frag, 0.0f);
+
+        // Moltiplica i fragment
+        wmma::mma_sync(acc_frag, a_frag, b_frag, acc_frag);
+
+        // Memorizza il risultato
+        wmma::store_matrix_sync(c + cRow + cCol + cPage, acc_frag, BLOCK_SIZE, wmma::mem_row_major);
+    }
 }
 
 __device__ void wmmaMatrixMultiply(const half *As, const half *Bs, float *Cs, int N){
     int warpId = threadIdx.x / 32;  // Warp ID nel blocco
-    int laneId = threadIdx.x % 32;  // Lane ID nel warp
+    // int laneId = threadIdx.x % 32;  // Lane ID nel warp
 
     int row = (warpId / 2) * 16;  // Calcolo della riga del frammento
     int col = (warpId % 2) * 16;  // Calcolo della colonna del frammento
@@ -241,29 +278,34 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_
     Cs[threadIdx.x] = 0;
     // __syncthreads();
 
-    wmmaMatrixMultiply(As, Bs, Cs, n);
-    // blockMatrixMul(As, Bs, Cs, n);
+    // wmmaMatrixMultiply(As, Bs, Cs, n);
+    blockMatrixMul(As, Bs, Cs, BLOCK_SIZE);
+    
+    //Attendi i thread dei primi 8 warp per completare la computazione
+    __syncthreads();
+
+    //Somma i risultati parziali nella matrice in global memory
+    d_c[threadIdx.x] = Cs[threadIdx.x] + Cs[threadIdx.x + BLOCK_SIZE * BLOCK_SIZE];
+
     // blockMatrixMul(a, b, d_c, n);
     // copyBlockToGlobal(Cs, d_c, blockIdx.y, blockIdx.x, n);
     if(blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0){
         printf("Matrice As:\n");
         printNMat(As, 4, 4, n);
 
-        printf("Matrice Bs:\n");
+        printf("\nMatrice Bs:\n");
         printNMat(Bs, 4, 4, n);
 
-        printf("Matrice Cs:\n");
+        printf("\nMatrice Cs[0]:\n");
         printNMat(Cs, 4, 4, n);
 
-        // //Global memory
-        // printf("Matrice A:\n");
-        // printNMat(a, 4, 4, n);
+        printf("\nMatrice Cs[1]:\n");
+        printNMat(Cs + BLOCK_SIZE * BLOCK_SIZE, 4, 4, n);
 
-        // printf("Matrice B:\n");
-        // printNMat(b, 4, 4, n);
+        printf("\nMatrice C:\n");
+        printNMat(d_c, 4, 4, n);
 
-        // printf("Matrice C:\n");
-        // printNMat(d_c, 4, 4, n);
+        printf("\n");
     }
 #else
     __shared__ half  As [SHARED_PAGE_COUNT * BLOCK_SIZE * BLOCK_SIZE];
