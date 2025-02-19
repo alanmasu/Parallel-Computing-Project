@@ -20,7 +20,7 @@ using namespace nvcuda;
     #define THREADS_PER_BLOCK 32
 #endif
 
-#define SHARED_PAGE_COUNT 4
+#define SHARED_PAGE_COUNT 8
 
 void serialMatMul(const float *A, const float *B, float *C, int N){
     for(int r = 0; r < N; ++r){
@@ -162,16 +162,31 @@ __device__ void blockMatrixMul(const half *a, const half *b, float *c, int n){
     wmma::fragment<wmma::matrix_b, WMMA_N, WMMA_N, WMMA_N, half, wmma::row_major> b_frag;
     wmma::fragment<wmma::accumulator, WMMA_N, WMMA_N, WMMA_N, float> acc_frag;
     
+    // Calcolo del warp ID e del lane ID
+    int warpId = threadIdx.x / 32;  // Warp ID nel blocco
+    
+    // // Calcolo del blocco
+    // int blockNumber = warpId / 8;       // Siccome ogni blocco 32x32 richiede 8 WMMA, il blocco lo si ottine dividendo per 8 il warp ID
+    // int blockRow    = blockNumber / 2;  // Calcolo della riga del blocco
+    // int blockCol    = blockNumber % 2;  // Calcolo della colonna del blocco
+
+    // Calcolo del tile
+    int tileNumber = warpId % 4;        // Calcolo del numero di tile, ad ogni warp è assegnato un tile, abbiamo 2 operazioni per tile e 4 tile, da qui l'esigenza di 8 warp
+    int tilePage   = (warpId % 8) / 4;  // Calcolo della pagina del tile, per ogni tile abbiamo bisogno di 2 computazioni; 
+    int tileRow    = tileNumber / 2;    // Calcolo della riga del tile
+    int tileCol    = tileNumber % 2;    // Calcolo della colonna del tile
+
+
     // Carica i fragment
-    wmma::load_matrix_sync(a_frag,   a, BLOCK_SIZE);
-    wmma::load_matrix_sync(b_frag,   b, BLOCK_SIZE);
-    wmma::load_matrix_sync(acc_frag, c, BLOCK_SIZE, wmma::mem_row_major);
+    wmma::load_matrix_sync(a_frag,   a + tileRow * BLOCK_SIZE * n + tileCol * WMMA_N + tilePage * WMMA_N, BLOCK_SIZE);
+    wmma::load_matrix_sync(b_frag,   b + tileCol * BLOCK_SIZE * n + tileRow * WMMA_N + tilePage * BLOCK_SIZE * n, BLOCK_SIZE);
+    wmma::load_matrix_sync(acc_frag, c + tileRow * BLOCK_SIZE * n + tileCol * WMMA_N, BLOCK_SIZE, wmma::mem_row_major);
 
     // Moltiplica i fragment
     wmma::mma_sync(acc_frag, a_frag, b_frag, acc_frag);
 
     // Memorizza il risultato
-    wmma::store_matrix_sync(c, acc_frag, BLOCK_SIZE, wmma::mem_row_major);
+    wmma::store_matrix_sync(c + tileRow * BLOCK_SIZE * n + tileCol * WMMA_N, acc_frag, BLOCK_SIZE, wmma::mem_row_major);
 }
 
 __device__ void wmmaMatrixMultiply(const half *As, const half *Bs, float *Cs, int N){
@@ -241,8 +256,8 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_
     Cs[threadIdx.x] = 0;
     // __syncthreads();
 
-    wmmaMatrixMultiply(As, Bs, Cs, n);
-    // blockMatrixMul(As, Bs, Cs, n);
+    // wmmaMatrixMultiply(As, Bs, Cs, n);
+    blockMatrixMul(As, Bs, Cs, BLOCK_SIZE);
     // blockMatrixMul(a, b, d_c, n);
     // copyBlockToGlobal(Cs, d_c, blockIdx.y, blockIdx.x, n);
     if(blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0){
