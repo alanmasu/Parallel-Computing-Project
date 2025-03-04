@@ -92,4 +92,9 @@ cudaError_t convertFloatToHalf(const float *A, half **B, int N);
 */
 __host__ __device__ void printNMat(const half* mat, int rows, int cols, int N);
 
+
+#ifdef TESTING
+__global__ void testSharedMemoryFunctions(float* source, float* destination);
+#endif
+
 #endif // MATMUL_H

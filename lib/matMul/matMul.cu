@@ -164,7 +164,6 @@ __device__ void blockMatrixMul(const half *a, const half *b, float *c, int n){
     
     // Calcolo del warp ID e del lane ID
     int warpId = threadIdx.x / 32;  // Warp ID nel blocco
-    int laneId = threadIdx.x % 32;  // Lane ID nel warp
     
     // // Calcolo del blocco
     int blockNumber = warpId / 8;       // Siccome ogni blocco 32x32 richiede 8 WMMA, il blocco lo si ottine dividendo per 8 il warp ID
@@ -177,11 +176,14 @@ __device__ void blockMatrixMul(const half *a, const half *b, float *c, int n){
     int tileRow    = tileNumber / 2;    // Calcolo della riga del tile
     int tileCol    = tileNumber % 2;    // Calcolo della colonna del tile
 
-#ifdef PRINT_DEBUG
-    if(laneId == 0){
-        printf("Warp ID: %d, Block Number: %d, Tile Number: %d, Tile Page: %d, Tile Row: %d, Tile Col: %d\n", warpId, blockNumber, tileNumber, tilePage, tileRow, tileCol);
-    }
-#endif
+    #ifdef PRINT_DEBUG
+        #warning "Debug print enabled"
+
+        int laneId = threadIdx.x % 32;  // Lane ID nel warp
+        // if(laneId == 0){
+        //     printf("Warp ID: %d, Block Number: %d, Tile Number: %d, Tile Page: %d, Tile Row: %d, Tile Col: %d\n", warpId, blockNumber, tileNumber, tilePage, tileRow, tileCol);
+        // }
+    #endif
 
     if(tileRow * WMMA_N < BLOCK_SIZE && tileCol * WMMA_N < BLOCK_SIZE && blockNumber == 0){
         int cRow = tileRow * WMMA_N * n;
@@ -191,49 +193,35 @@ __device__ void blockMatrixMul(const half *a, const half *b, float *c, int n){
         int aCol = tilePage * WMMA_N;
         int bRow = tilePage * WMMA_N * n;
 
-#ifdef PRINT_DEBUG
-#warning "Debug print enabled"
-        if(laneId == 0){
-            printf("Warp %d is computing: c[%d][%d][%d] = a[%d][%d] * b[%d][%d]\n", warpId, cPage, cRow, cCol, cRow, aCol, bRow, cCol);
-        }
-#endif
-        // Carica i fragment
-        wmma::load_matrix_sync(a_frag,   a + cRow + aCol, BLOCK_SIZE);
-        wmma::load_matrix_sync(b_frag,   b + bRow + cCol, BLOCK_SIZE);
-        // wmma::load_matrix_sync(acc_frag, c + cRow + cCol, BLOCK_SIZE, wmma::mem_row_major);
-        wmma::fill_fragment(acc_frag, 0.0f);
+        #ifdef PRINT_DEBUG
+            if(laneId == 0){
+                // printf("Warp %d of block [%d][%d] is computing: c[%d][%d][%d] = a[%d][%d] * b[%d][%d]\n", warpId, blockIdx.x, blockIdx.y, cPage, cRow, cCol, cRow, aCol, bRow, cCol);
+                printf("Warp %d of block [%d][%d] is computing: c[%d][%d][%d] = a[%d][%d] * b[%d][%d] (a[0,0] = %f, b[0,0] = %f)\n", warpId, blockIdx.x, blockIdx.y, cPage, cRow, cCol, cRow, aCol, bRow, cCol, __half2float(a[0]), 0.0);
+            }
+        #else
+            // Carica i fragment
+            wmma::load_matrix_sync(a_frag,   a + cRow + aCol, BLOCK_SIZE);
+            wmma::load_matrix_sync(b_frag,   b + bRow + cCol, BLOCK_SIZE);
+            wmma::load_matrix_sync(acc_frag, c + cRow + cCol, BLOCK_SIZE, wmma::mem_row_major);
+            // wmma::fill_fragment(acc_frag, 0.0f);
 
-        // Moltiplica i fragment
-        wmma::mma_sync(acc_frag, a_frag, b_frag, acc_frag);
+            // Moltiplica i fragment
+            wmma::mma_sync(acc_frag, a_frag, b_frag, acc_frag);
 
-        // Memorizza il risultato
-        wmma::store_matrix_sync(c + cRow + cCol + cPage, acc_frag, BLOCK_SIZE, wmma::mem_row_major);
-    }
-}
-
-__device__ void wmmaMatrixMultiply(const half *As, const half *Bs, float *Cs, int N){
-    int warpId = threadIdx.x / 32;  // Warp ID nel blocco
-    // int laneId = threadIdx.x % 32;  // Lane ID nel warp
-
-    int row = (warpId / 2) * 16;  // Calcolo della riga del frammento
-    int col = (warpId % 2) * 16;  // Calcolo della colonna del frammento
-
-    // Controllo che l'accesso sia nei bound della matrice N×N
-    if (row < N && col < N) {
-        wmma::fragment<wmma::matrix_a, 16, 16, 16, half, wmma::row_major> fragA;
-        wmma::fragment<wmma::matrix_b, 16, 16, 16, half, wmma::col_major> fragB;
-        wmma::fragment<wmma::accumulator, 16, 16, 16, float> fragC;
-
-        wmma::fill_fragment(fragC, 0.0f);
-        wmma::load_matrix_sync(fragA, As + row * N + col, N);
-        wmma::load_matrix_sync(fragB, Bs + row * N + col, N);
-        wmma::mma_sync(fragC, fragA, fragB, fragC);
-        wmma::store_matrix_sync(Cs + row * N + col, fragC, N, wmma::mem_row_major);
+            // Memorizza il risultato
+            wmma::store_matrix_sync(c + cRow + cCol + cPage, acc_frag, BLOCK_SIZE, wmma::mem_row_major);
+        #endif
     }
 }
 
 /**! 
     @brief Funzione per il caricamento di un blocco di matrice in shared memory
+
+    @param a puntatore alla matrice in global memory
+    @param As puntatore alla matrice in shared memory
+    @param r riga del blocco
+    @param c colonna del blocco
+    @param n dimensione della matrice
 
 */
 template <typename T>
@@ -310,28 +298,82 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_
 #else
     __shared__ half  As [SHARED_PAGE_COUNT * BLOCK_SIZE * BLOCK_SIZE];
     __shared__ half  Bs [SHARED_PAGE_COUNT * BLOCK_SIZE * BLOCK_SIZE];
-    __shared__ float  Cs [SHARED_PAGE_COUNT * BLOCK_SIZE * BLOCK_SIZE];
+    __shared__ float  Cs [2 * BLOCK_SIZE * BLOCK_SIZE];
 
-    int numPages = n / (SHARED_PAGE_COUNT * 32);                        // 32 è il numero di elementi per pagina di shared memory
-    int numBlocks = numPages < 1 ? n / BLOCK_SIZE : SHARED_PAGE_COUNT;  // Se la matrice è piccola non tutti i blocchi di shared memory sono utilizzati
-    int blockRow = blockIdx.y;
-    int blockCol = blockIdx.x;
+    const int numPages = n / (SHARED_PAGE_COUNT * 32) || 1;                   // 32 è il numero di elementi per pagina di shared memory
+    const int numBlocks = numPages < 2 ? n / BLOCK_SIZE : SHARED_PAGE_COUNT;  // Se la matrice è piccola non tutti i blocchi di shared memory sono utilizzati
+    const int blockRow = blockIdx.y;
+    const int blockCol = blockIdx.x;
+
+    if(blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0){
+        printf("numPages: %d, numBlocks: %d\n", numPages, numBlocks);
+    }
 
     for(int p = 0; p < numPages; ++p){
         // Carica la riga di blocchi della matrice A in shared memory
-        int pageOffset = p * SHARED_PAGE_COUNT * BLOCK_SIZE * n;
-        loadBlockToShared(a, As, pageOffset, blockRow, n);  
-        loadBlockToShared(d_c, Cs, pageOffset, blockRow, n); 
+        const int pageOffset = p * SHARED_PAGE_COUNT;  // Calcola l'offset della pagina in numero di blocchi
+        const int blockSize = BLOCK_SIZE * BLOCK_SIZE;
+
+        // Debug
+        if(threadIdx.x == 0){
+            printf("Page Offset: %d\n", pageOffset);
+        }
+
+        
+        // Carica il blocco dalla matrice C in shared memory
+        loadBlockToShared(d_c, Cs, blockRow, blockCol, n);
+
         for(int k = 0; k < numBlocks; ++k){
             // Carica i blocchi in shared memory
-            loadBlockToShared(b, Bs, blockCol, k, n);
-            blockMatrixMul(As, Bs, Cs, n);
+            loadBlockToShared(a, As + k * blockSize, blockRow, pageOffset + k, n);  
+            loadBlockToShared(b, Bs + k * blockSize, pageOffset + k, blockCol, n);
+            // if(threadIdx.x == 0){
+            //     printf("CudaBlock: %d, %d \t Page: %d \t k: %d\n As[0] = %f\n Bs[0] = %f\n a[%d][%d] b[%d][%d]\n", blockRow, blockCol, p, k, __half2float(As[0 + k * blockSize]), __half2float(Bs[0 + k * blockSize]),blockRow, pageOffset + k, pageOffset + k, blockCol);
+            // }
+            blockMatrixMul(As + k * blockSize, Bs + k * blockSize, Cs, BLOCK_SIZE);
+
+            // Attendi i thread dei primi 8 warp per completare la computazione
+            __syncthreads();
+
+            Cs[blockSize + threadIdx.x] += Cs[threadIdx.x + BLOCK_SIZE * BLOCK_SIZE];
+
+            // if(threadIdx.x == 0){
+            //     printf("Matrice Cs (dopo la somma): \n");
+            //     printNMat(Cs, 4, 4, BLOCK_SIZE);
+            // }
         }
-        copyBlockToGlobal(Cs, d_c, pageOffset, blockRow, n);
+        copyBlockToGlobal(Cs + blockSize, d_c, blockCol, blockRow, n);
+
+
+        // __syncthreads();
+
+        // if(blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0){
+        //     printf("Matrice Cs[0]: \n");
+        //     printNMat(Cs, 4, 4, BLOCK_SIZE);
+
+        //     printf("\nMatrice Cs[1]: \n");
+        //     printNMat(Cs + BLOCK_SIZE * BLOCK_SIZE, 4, 4, BLOCK_SIZE);
+        // }
+
+        // Cs[threadIdx.x] += Cs[threadIdx.x + BLOCK_SIZE * BLOCK_SIZE];
+        // if(blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0){
+        //     printf("\nMatrice Cs[0] (dopo la somma): \n");
+        //     printNMat(Cs, 4, 4, BLOCK_SIZE);
+        // }
     }
+    // copyBlockToGlobal(Cs, d_c, blockCol, blockRow, n);
 #endif
 }
 #endif // WMMA_BATCHED
+
+#ifdef TESTING
+__global__ void testSharedMemoryFunctions(float* source, float* destination){
+    __shared__ float sharedMem[32 * 32];
+    loadBlockToShared(source, sharedMem, 0, 0, 32);
+    copyBlockToGlobal(sharedMem, destination, 0, 0, 32);
+}
+#endif
+
 
 cudaError_t convertFloatToHalf(const float *A, half **B, int N){
     half* h_B = (half*)malloc(N * N * sizeof(half));

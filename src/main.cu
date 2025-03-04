@@ -194,14 +194,78 @@ int main(int argc, char **argv) {
 #else
 
 #ifdef TESTING_WMMA
+  #warning "WMMA TESTING"
   #define N 32
 #endif
 
 #ifndef N
-  #define N 512
+  #define N 64
+//   #define N 512
 #endif
 
 #warning "Testing mode"
+
+void testShared(){
+    //Testing shared memory
+    float* test = NULL;
+    float* testDevice = NULL;
+    float* destination = NULL;
+    test = (float*)malloc(32 * 32 * sizeof(float));
+    
+    if(test == NULL){
+        printf("[ERR]: Test shared memory FAILED -> due to failed allocation on host (LINE: %d, FILE:%s)\n", __LINE__, __FILE__);
+    }
+
+    cudaError_t err = cudaMalloc((void**)&testDevice, 32 * 32 * sizeof(float));
+    if(err != cudaSuccess){
+        printf("[ERR]: Test shared memory FAILED -> due to failed allocation on device (LINE: %d, FILE:%s)\n", __LINE__, __FILE__);
+    }
+
+    err = cudaMalloc((void**)&destination, 32 * 32 * sizeof(float));
+    if(err != cudaSuccess){
+        printf("[ERR]: Test shared memory FAILED -> due to failed allocation on device (LINE: %d, FILE:%s)\n", __LINE__, __FILE__);
+    }
+
+    for(int i = 0; i < 32 * 32; i++){
+        test[i] = i;
+    }
+    
+    err = cudaMemcpy(testDevice, test, 32 * 32 * sizeof(float), cudaMemcpyHostToDevice);
+    if(err != cudaSuccess){
+        printf("[ERR]: Test shared memory FAILED -> due to failed copy from host to device (LINE: %d, FILE:%s)\n", __LINE__, __FILE__);
+    }else{
+        memset(test, 0, 32 * 32 * sizeof(float));
+    }
+
+    testSharedMemoryFunctions<<<1, 1024>>>(testDevice, destination);
+    bool success = true;
+    err = cudaMemcpy(test, destination, 32 * 32 * sizeof(float), cudaMemcpyDeviceToHost);
+    if(err != cudaSuccess){
+        printf("[ERR]: Test shared memory FAILED -> due to failed copy from device to host (LINE: %d, FILE:%s)\n", __LINE__, __FILE__);
+    }else{
+        for(int i = 0; i < 32*32; ++i){
+            if(test[i] != i){
+                printf("[ERR]: Test shared memory FAILED -> test[%d] != i (LINE: %d, FILE:%s)\n", i, __LINE__, __FILE__);
+                success = false;
+                break;
+            }
+        }
+    }
+    if(success){
+        printf("[INFO]: Test shared memory PASSED\n");
+    }
+
+    if(test != NULL){
+        free(test);
+    }
+    if(testDevice != NULL){
+        cudaFree(testDevice);
+    }
+    if(destination != NULL){
+        cudaFree(destination);
+    }
+}
+
 
 int main(int argc, char **argv){
     printf("WMMA TEST: Testing mode\n");
@@ -210,6 +274,8 @@ int main(int argc, char **argv){
     float *h_B = NULL;
     float *h_C_cublas = NULL;
     float *h_C_wmma = NULL;
+    
+    testShared();
 
     // // Allocazione delle matrici sull'host (CPU)
     printf("[INFO]: Allocazione delle matrici sull'host\n");
@@ -278,8 +344,8 @@ int main(int argc, char **argv){
     }
 
     // Stampa dei risultati
-    printf("Tempo di esecuzione [cuBLAS] [size: %d]: %f ms\n", cublasMillis, N);
-    printf("TFLOPS [cuBLAS] [size: %d]: %f\n", cublasTFLOPS, N);
+    printf("\nTempo di esecuzione [cuBLAS] [size: %d]: %f ms\n", cublasMillis, N);
+    printf("TFLOPS [cuBLAS] [size: %d]: %f\n\n", cublasTFLOPS, N);
     
     //Libero la memoria delle matrici sorgenti
     if(err1 == cudaSuccess && err2 == cudaSuccess){
@@ -334,14 +400,16 @@ int main(int argc, char **argv){
 
     // Stampa dei risultati
     printf("\n\nTempo di esecuzione [wmma] [size: %d]: %f ms\n", myMillis, N);
-    printf("TFLOPS [wmma] [size: %d]: %f\n", myTFLOPS, N);
+    printf("TFLOPS [wmma] [size: %d]: %f\n\n", myTFLOPS, N);
 
     //Testing dei risultati e confronto con cuBLAS
+    bool success = true;
     for(int i = 0; i < N * N; i++){
         if(h_C_cublas[i] - h_C_wmma[i] > 0.2){
             printf("\n\n[ERRORE]: i risultati non coincidono\n");
             printf("h_C_cublas[%d] != h_C_wmma[%d]\n", i, i);
             printf("%f != %f\n", h_C_cublas[i], h_C_wmma[i]);
+            success = false;
             break;
         }
     }
@@ -369,6 +437,10 @@ int main(int argc, char **argv){
         d_B_half = NULL;
         d_C = NULL;
     }
+    if(success){
+        return 0;
+    }
+    return 2;
 }
 
 #endif
