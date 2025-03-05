@@ -11,11 +11,13 @@ TEST_DIR = test
 TEST_BIN_DIR = $(BIN_DIR)/test
 
 # Trova tutti i file sorgenti .cu in src e nelle sottodirectory di lib
-SRCS = $(wildcard $(SRC_DIR)/*.cu) $(wildcard $(LIB_DIR)/*/*.cu)
+SRC_MAIN = $(SRC_DIR)/main.cu
+SRC_FILES = $(filter-out $(SRC_MAIN), $(wildcard $(SRC_DIR)/*.cu))
+LIB_FILES = $(wildcard $(LIB_DIR)/*/*.cu)
 
 # Crea i file oggetto corrispondenti mantenendo la struttura delle directory
-OBJS = $(patsubst $(SRC_DIR)/%.cu,$(OBJ_DIR)/src/%.o,$(wildcard $(SRC_DIR)/*.cu)) \
-       $(patsubst $(LIB_DIR)/%/%.cu,$(OBJ_DIR)/lib/%/%.o,$(wildcard $(LIB_DIR)/*/*.cu))
+SRC_OBJS = $(patsubst $(SRC_DIR)/%.cu, $(OBJ_DIR)/src/%.o, $(SRC_FILES))
+LIB_OBJS = $(patsubst $(LIB_DIR)/%/%.cu, $(OBJ_DIR)/lib/%/%.o, $(LIB_FILES))
 
 # Trova tutte le sottodirectory in lib e le aggiunge al percorso degli include
 INCLUDE_DIRS = $(shell find $(LIB_DIR) -type d)
@@ -32,23 +34,27 @@ $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
 
 $(OBJ_DIR):
-	mkdir -p $(OBJ_DIR)/src $(OBJ_DIR)/lib
+	mkdir -p $(OBJ_DIR)/src 
 
 # Regola di default
 all: $(BIN_DIR) $(OBJ_DIR) $(BIN_DIR)/$(TARGET)
 
-# Compilazione dei file oggetto dalla directory src
+# Compilazione dei file oggetto dalla directory src (escludendo main.cu)
 $(OBJ_DIR)/src/%.o: $(SRC_DIR)/%.cu
 	$(NVCC) $(NVCC_FLAGS) -c $< -o $@
 
-# Compilazione dei file oggetto dalle sottodirectory di lib (come lib/matMul)
+# Compilazione del main separatamente
+$(OBJ_DIR)/src/main.o: $(SRC_DIR)/main.cu
+	$(NVCC) $(NVCC_FLAGS) -c $< -o $@
+
+# Compilazione dei file oggetto dalle sottodirectory di lib
 $(OBJ_DIR)/lib/%/%.o: $(LIB_DIR)/%/%.cu
 	mkdir -p $(OBJ_DIR)/lib/$*
 	$(NVCC) $(NVCC_FLAGS) -c $< -o $@
 
 # Link e generazione dell'eseguibile principale
-$(BIN_DIR)/$(TARGET): $(OBJS)
-	$(NVCC) $(NVCC_FLAGS) $(OBJS) -o $@
+$(BIN_DIR)/$(TARGET): $(OBJ_DIR)/src/main.o $(SRC_OBJS) $(LIB_OBJS)
+	$(NVCC) $(NVCC_FLAGS) $^ -o $@
 
 # --------------------------------
 # Sezione per i test
@@ -65,9 +71,9 @@ test: $(TEST_BIN_DIR) $(TEST_BINS)
 $(TEST_BIN_DIR):
 	mkdir -p $(TEST_BIN_DIR)
 
-# Regola per compilare ogni test con le librerie di lib/
-$(TEST_BIN_DIR)/%: $(TEST_DIR)/% $(OBJS)
-	$(NVCC) $(NVCC_FLAGS) $(wildcard $</*.cu) $(OBJS) -o $@
+# Regola per compilare ogni test (senza src/main.o)
+$(TEST_BIN_DIR)/%: $(TEST_DIR)/% $(LIB_OBJS)
+	$(NVCC) $(NVCC_FLAGS) $(wildcard $</*.cu) $(LIB_OBJS) -o $@
 
 # Pulizia dei file generati
 clean:
