@@ -94,7 +94,14 @@ __host__ __device__ void printNMat(const half* mat, int rows, int cols, int N);
 
 
 #ifdef TESTING
-__global__ void testSharedMemoryFunctions(float* source, float* destination);
+__global__ void testSharedMemoryFunctions(float* source, float* destination00, float* destination11, int size);
+
+/**!
+    @brief      Function to perform a multiplication between two block of matrices using shared memory
+    @details    This function tests the shared memory functions by copying the source matrix to the destination matrix
+                using shared memory
+*/
+__global__ void testBlockMatrixMultiplication(half* A, half* B, float* C, int r, int c, int N);
 #endif
 
 #endif // MATMUL_H

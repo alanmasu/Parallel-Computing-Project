@@ -206,53 +206,131 @@ int main(int argc, char **argv) {
 #warning "Testing mode"
 
 void testShared(){
+    printf("\n--------- TESTING SHARED MEMORY ---------\n");
+
+
+    //Sizes
+    const int size = 64;
+    const int bs = 32;
+
+
     //Testing shared memory
     float* test = NULL;
     float* testDevice = NULL;
     float* destination = NULL;
-    test = (float*)malloc(32 * 32 * sizeof(float));
+    float* destination2 = NULL;
+    float* destinationHost = NULL;
+
+    
+    test = (float*)malloc(size * size * sizeof(float));
     
     if(test == NULL){
         printf("[ERR]: Test shared memory FAILED -> due to failed allocation on host (LINE: %d, FILE:%s)\n", __LINE__, __FILE__);
+    }else{
+        // printf("
     }
 
-    cudaError_t err = cudaMalloc((void**)&testDevice, 32 * 32 * sizeof(float));
+    destinationHost = (float*)malloc(size * size * sizeof(float));
+    if(destinationHost == NULL){
+        printf("[ERR]: Test shared memory FAILED -> due to failed allocation on host (LINE: %d, FILE:%s)\n", __LINE__, __FILE__);
+    }
+
+    cudaError_t err = cudaMalloc((void**)&testDevice, size * size * sizeof(float));
     if(err != cudaSuccess){
         printf("[ERR]: Test shared memory FAILED -> due to failed allocation on device (LINE: %d, FILE:%s)\n", __LINE__, __FILE__);
+    }else{
+        printf("testDevice: %p\n", testDevice);
     }
 
-    err = cudaMalloc((void**)&destination, 32 * 32 * sizeof(float));
+    err = cudaMalloc((void**)&destination, size * size * sizeof(float));
     if(err != cudaSuccess){
         printf("[ERR]: Test shared memory FAILED -> due to failed allocation on device (LINE: %d, FILE:%s)\n", __LINE__, __FILE__);
+    }else{
+        printf("destination: %p\n", destination);
     }
 
-    for(int i = 0; i < 32 * 32; i++){
+    err = cudaMalloc((void**)&destination2, size * size * sizeof(float));
+    if(err != cudaSuccess){
+        printf("[ERR]: Test shared memory FAILED -> due to failed allocation on device (LINE: %d, FILE:%s)\n", __LINE__, __FILE__);
+    }else{
+        printf("destination2: %p\n", destination2);
+    }
+
+    for(int i = 0; i < size * size; i++){
         test[i] = i;
     }
     
-    err = cudaMemcpy(testDevice, test, 32 * 32 * sizeof(float), cudaMemcpyHostToDevice);
+    err = cudaMemcpy(testDevice, test, size * size * sizeof(float), cudaMemcpyHostToDevice);
     if(err != cudaSuccess){
         printf("[ERR]: Test shared memory FAILED -> due to failed copy from host to device (LINE: %d, FILE:%s)\n", __LINE__, __FILE__);
     }else{
-        memset(test, 0, 32 * 32 * sizeof(float));
+        // memset(test, 0, size * size * sizeof(float));
     }
 
-    testSharedMemoryFunctions<<<1, 1024>>>(testDevice, destination);
+    //Calling the kernel
+    testSharedMemoryFunctions<<<1, 1024>>>(testDevice, destination, destination2, size);
+
+    cudaDeviceSynchronize();
+
+    //For testing
     bool success = true;
-    err = cudaMemcpy(test, destination, 32 * 32 * sizeof(float), cudaMemcpyDeviceToHost);
+    int rSh = 0;
+    int cSh = 0;
+    
+    //Testing block 0,0
+    printf("\n--------- TESTING BLOCK 0,0 ---------\n");
+    err = cudaMemcpy(destinationHost, destination, size * size * sizeof(float), cudaMemcpyDeviceToHost);
     if(err != cudaSuccess){
         printf("[ERR]: Test shared memory FAILED -> due to failed copy from device to host (LINE: %d, FILE:%s)\n", __LINE__, __FILE__);
+        printf("\tError: %s\n\tDescription: %s\n", cudaGetErrorName(err), cudaGetErrorString(err));
     }else{
-        for(int i = 0; i < 32*32; ++i){
-            if(test[i] != i){
-                printf("[ERR]: Test shared memory FAILED -> test[%d] != i (LINE: %d, FILE:%s)\n", i, __LINE__, __FILE__);
-                success = false;
+        rSh = 0;
+        for(int r = 0; r < 32; ++r){
+            for(int c = 0; c < 32; ++c){
+                if(test[r * size + c] != destinationHost[r * size + c]){
+                    printf("[ERR]: Test shared memory FAILED -> test[%d] != destinationHost[%d]: %f != %f \t\t(LINE: %d, FILE:%s)\n", r * size + c, rSh * bs + cSh, test[r * size + c], destinationHost[rSh * bs + cSh],__LINE__, __FILE__);
+                    success = false;
+                    break;
+                }
+            }
+            if(!success){
                 break;
             }
         }
     }
     if(success){
-        printf("[INFO]: Test shared memory PASSED\n");
+        printf("[INFO]: Test shared memory (block 0,0) PASSED\n");
+    }else{
+        printf("[ERR]: Test shared memory (block 0,0) FAILED\n");
+    }
+
+    // //Testing block 1,1
+    printf("\n--------- TESTING BLOCK 1,1 ---------\n");
+    success = true;
+    err = cudaMemcpy(destinationHost, destination2, size * size * sizeof(float), cudaMemcpyDeviceToHost);
+    if(err != cudaSuccess){
+        printf("[ERR]: Test shared memory FAILED -> due to failed copy from device to host (LINE: %d, FILE:%s)\n", __LINE__, __FILE__);
+        printf("\tError: %s\n\tDescription: %s\n", cudaGetErrorName(err), cudaGetErrorString(err));
+    }else{
+        printf("\n");
+        rSh = 0;
+        for(int r = 32; r < 64; ++r){
+            for(int c = 32; c < 64; ++c){
+                if(test[r * size + c] != destinationHost[r * size + c]){
+                    printf("[ERR]: Test shared memory FAILED -> test[%d] != destinationHost[%d]: %f != %f \t\t(LINE: %d, FILE:%s)\n", r * size + c, rSh * bs + cSh, test[r * size + c], destinationHost[rSh * bs + cSh],__LINE__, __FILE__);
+                    success = false;
+                    break;
+                }
+            }
+            if(!success){
+                break;
+            }
+        }
+    }
+    if(success){
+        printf("[INFO]: Test shared memory (block 1,1) PASSED\n\n");
+    }else{
+        printf("[ERR]: Test shared memory (block 1,1) FAILED\n\n");
     }
 
     if(test != NULL){
@@ -278,6 +356,7 @@ int main(int argc, char **argv){
     testShared();
 
     // // Allocazione delle matrici sull'host (CPU)
+    printf("\n--------- TESTING CODE ---------\n");
     printf("[INFO]: Allocazione delle matrici sull'host\n");
     size_t matrix_size = N * N * sizeof(float);
     h_A = (float *)malloc(matrix_size);
@@ -289,12 +368,26 @@ int main(int argc, char **argv){
     // Inizializza le matrici A e B sull'host
     if(h_A != NULL && h_B != NULL && h_C_wmma != NULL){
         printf("[INFO]: Inizializzazione delle matrici sull'host\n");
-        for (int i = 0; i < N * N; ++i) {
-            // h_A[i] = 0.1;
-            // h_B[i] = 0.2;
-            h_A[i] = i;
-            h_B[i] = i;
+        for (int i = 0; i < N; ++i) {
+            for(int j = 0; j < N; ++j){
+                // h_A[i] = 0.1;
+                // h_B[i] = 0.2;                // Blocco [r,c]
+                if(i < 32  && j < 32){          // Blocco [0,0] [ERROR]
+                    h_A[i + j * N] = i + j * N;
+                    h_B[i + j * N] = i + j * N;
+                }else if(i >= 32 && j < 32){    // Blocco [0,1] [OK]
+                    h_A[i + j * N] = 0;
+                    h_B[i + j * N] = 0;
+                }else if(i < 32 && j >= 32){    // Blocco [1,0] [ERROR]
+                    h_A[i + j * N] = 0;
+                    h_B[i + j * N] = 0;
+                }else{                          // Blocco [1,1] [OK]
+                    h_A[i + j * N] = 0;
+                    h_B[i + j * N] = 0;
+                }
+            }
         }
+        printf("A[0,1]: %f\nA[0,32]: %f\nA[32,0]: %f\nA[32,32]: %f\n\n", h_A[1], h_A[32], h_A[32 * N], h_A[32 * N + 32]);
         memset(h_C_wmma, 0, matrix_size);
     }else{
         printf("[ERR]:Errore nell'allocazione delle matrici sull'host\n");
@@ -360,6 +453,15 @@ int main(int argc, char **argv){
     half* d_A_half = NULL;
     half* d_B_half = NULL;
     
+    // #ifdef TESTING_BATCHED
+    //     #warning "Testing batched"
+    //     for(int row = 32; row < 64; ++row){
+    //         for(int col = 0; col < 32; ++col){
+    //             d_A[row * 64 + col] = row * 64 + col;
+    //             d_b[row * 64 + col] = row * 64 + col;
+    //         }
+    //     }
+    // #endif
     // Allocazione delle matrici sul device e conversione in half
     printf("[INFO]: Allocazione delle matrici half A e B sulla GPU\n");
     err1 = convertFloatToHalf(h_A, &d_A_half, N);
@@ -377,7 +479,11 @@ int main(int argc, char **argv){
 
     // Moltiplicazione di matrici con kernel custom
     tensorCoreMatMul(d_A_half, d_B_half, d_C, N, &myMillis, &myTFLOPS);
-
+    // #ifndef TESTING_BATCHED
+    //     tensorCoreMatMul(d_A_half, d_B_half, d_C, N, &myMillis, &myTFLOPS);
+    // #else
+    //     testBlockMatrixMultiplication(d_A_half, d_B_half, d_C, 0, 0, 64);
+    // #endif
     // Copia dei risultati dalla GPU all'host
     checkCudaError(cudaMemcpy(h_C_wmma, d_C, matrix_size, cudaMemcpyDeviceToHost), "Copia matrice C dal device");
     //Stampa delle matrici

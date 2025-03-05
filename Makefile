@@ -20,7 +20,7 @@ INCLUDE_FLAGS = $(addprefix -I, $(INCLUDE_DIRS))
 
 # Compilatore e flags
 NVCC = nvcc
-NVCC_FLAGS = -O3 -lineinfo $(INCLUDE_FLAGS) -lcublas -arch=sm_80 -DWMMA_BATCHED -DTESTING #-DPRINT_DEBUG
+NVCC_FLAGS = -O3 -lineinfo $(INCLUDE_FLAGS) -lcublas -arch=sm_80 -DWMMA_BATCHED -DTESTING -DTESTING_BATCHED
 
 main: all
 
