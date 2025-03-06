@@ -16,5 +16,5 @@ module load cuda/12.1
 cd /home/alan.masutti/Project
 # git stash save "Stashing changes for Job Execution"
 # git checkout WMMA_MatMul_v1.0.1
-make
-srun /home/alan.masutti/Project/build/bin/main
+make test
+srun /home/alan.masutti/Project/build/bin/test/test_batched

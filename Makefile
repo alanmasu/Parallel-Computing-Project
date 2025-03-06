@@ -12,7 +12,7 @@ TEST_BIN_DIR = $(BIN_DIR)/test
 
 # Compilatore e flags
 NVCC = nvcc
-NVCC_FLAGS = -O3 -lineinfo $(INCLUDE_FLAGS) -lcublas -arch=sm_80 -DWMMA_BATCHED -DTESTING -DTESTING_BATCHED
+NVCC_FLAGS = -O3 -lineinfo $(INCLUDE_FLAGS) -lcublas -arch=sm_80 -DWMMA_BATCHED -DTESTING
 
 # Trova tutti i file sorgenti .cu in src e nelle sottodirectory di lib e test
 SRC_FILES = $(wildcard $(SRC_DIR)/*.cu)

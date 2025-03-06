@@ -4,6 +4,19 @@
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
 
+// Dimensione del fragment
+#ifndef TILE_SIZE
+    #define TILE_SIZE 16
+#endif
+
+#define BLOCK_SIZE 32
+
+#ifndef THREADS_PER_BLOCK
+    #define THREADS_PER_BLOCK 32
+#endif
+
+#define SHARED_PAGE_COUNT 8
+
 /*! 
     @brief      Function to perform matrix multiplication of two matrices A and B
 
@@ -68,6 +81,63 @@ void cublasMatMul(const float *d_A, const float *d_B, float *d_C, int N, float* 
 
 cudaError_t convertFloatToHalf(const float *A, half **B, int N);
 
+#ifdef WMMA_BATCHED
+/**! 
+    @brief Funzione per la moltiplicazione di blocchi BLOCK_SIZE x BLOCK_SIZE
+    @details La funzione prende in ingresso i puntatori alle matrici e moltiplica i due blocchi 
+    @param a [in] puntatore alla matrice A in shared memory
+    @param b [in] puntatore alla matrice B in shared memory
+    @param c [out] puntatore alla matrice C in shared memory
+    @param n dimensione delle matrici
+*/
+__device__ void blockMatrixMul(const half *a, const half *b, float *c, int n);
+#endif
+
+/**! 
+    @brief Funzione per il caricamento di un blocco di matrice in shared memory
+
+    @param a puntatore alla matrice in global memory
+    @param As puntatore alla matrice in shared memory
+    @param r riga del blocco
+    @param c colonna del blocco
+    @param n dimensione della matrice
+
+*/
+template <typename T>
+__device__ void loadBlockToShared(const T *a, T *As, int r, int c, int n){
+    int threadID = threadIdx.x;
+    int colInsideBlock = threadID % BLOCK_SIZE;
+    int rowInsideBlock = threadID / BLOCK_SIZE * n;
+    int blockColOffset = c * BLOCK_SIZE;
+    int blockRowOffset = r * BLOCK_SIZE * n;
+    int element = colInsideBlock + blockColOffset + rowInsideBlock + blockRowOffset;
+    if(element < n * n){
+        As[threadID] = a[element];
+    }
+}
+
+/**! 
+    @brief Funzione per copiare un blocco di matrice in global memory
+
+    @param As puntatore alla matrice in shared memory
+    @param a puntatore alla matrice in global memory
+    @param r riga del blocco
+    @param c colonna del blocco
+    @param n dimensione della matrice
+*/
+template <typename T>
+__device__ void copyBlockToGlobal(const T *As, T *a, int r, int c, int n){
+    int threadID = threadIdx.x;
+    int colInsideBlock = threadID % BLOCK_SIZE;
+    int rowInsideBlock = threadID / BLOCK_SIZE * n;
+    int blockColOffset = c * BLOCK_SIZE;
+    int blockRowOffset = r * BLOCK_SIZE * n;
+    int element = colInsideBlock + blockColOffset + rowInsideBlock + blockRowOffset;
+    if(element < n * n){
+        a[element] = As[threadID];
+    }
+}
+
 /*!
     @brief      Function to perform batched matrix multiplication of two matrices A and B using CUDA tensor cores
     @details    Performing a batched matrix multiplication of two matrices A and B and storing the result in matrix C. 
@@ -78,30 +148,13 @@ cudaError_t convertFloatToHalf(const float *A, half **B, int N);
     @param      N[in] Size of the row/column of the matrices
     @param      milliseconds[out] Time taken to perform the matrix multiplication
     @param      TFLOPS[out] Theoretical peak FLOPS achieved during the matrix multiplication
-    @param      bs[in] Size of the block to be used for matrix multiplication
 */
-#ifndef WMMA_BATCHED
-    void tensorCoreMatMul(const half *d_A, const half *d_B, float *d_C, int N, float* milliseconds, double* TFLOPS);
-#else
-    void tensorCoreMatMul(const half *d_A, const half *d_B, float *d_C, int N, float* milliseconds, double* TFLOPS);
-#endif
+void tensorCoreMatMul(const half *d_A, const half *d_B, float *d_C, int N, float* milliseconds, double* TFLOPS);
 
 /*!
     @brief      Function to print an half matrix
     @details    This function prints a specified number of rows and culomns of an half matrix on the console 
 */
 __host__ __device__ void printNMat(const half* mat, int rows, int cols, int N);
-
-
-#ifdef TESTING
-__global__ void testSharedMemoryFunctions(float* source, float* destination00, float* destination11, int size);
-
-/**!
-    @brief      Function to perform a multiplication between two block of matrices using shared memory
-    @details    This function tests the shared memory functions by copying the source matrix to the destination matrix
-                using shared memory
-*/
-__global__ void testBlockMatrixMultiplication(half* A, half* B, float* C, int r, int c, int N);
-#endif
 
 #endif // MATMUL_H
