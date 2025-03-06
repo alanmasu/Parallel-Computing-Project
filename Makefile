@@ -10,59 +10,61 @@ OUTPUT_DIR = run
 TEST_DIR = test
 TEST_BIN_DIR = $(BIN_DIR)/test
 
-# Trova tutti i file sorgenti .cu in src e nelle sottodirectory di lib
-SRC_MAIN = $(SRC_DIR)/main.cu
-SRC_FILES = $(filter-out $(SRC_MAIN), $(wildcard $(SRC_DIR)/*.cu))
+# Compilatore e flags
+NVCC = nvcc
+NVCC_FLAGS = -O3 -lineinfo $(INCLUDE_FLAGS) -lcublas -arch=sm_80
+
+# Trova tutti i file sorgenti .cu in src e nelle sottodirectory di lib e test
+SRC_FILES = $(wildcard $(SRC_DIR)/*.cu)
 LIB_FILES = $(wildcard $(LIB_DIR)/*/*.cu)
+TEST_FILES = $(wildcard $(TEST_DIR)/*/*.cu)
 
 # Crea i file oggetto corrispondenti mantenendo la struttura delle directory
-SRC_OBJS = $(patsubst $(SRC_DIR)/%.cu, $(OBJ_DIR)/src/%.o, $(SRC_FILES))
-LIB_OBJS = $(patsubst $(LIB_DIR)/%/%.cu, $(OBJ_DIR)/lib/%/%.o, $(LIB_FILES))
+SRC_OBJS = $(patsubst $(SRC_DIR)/%,$(OBJ_DIR)/src/%,$(SRC_FILES:.cu=.o))
+LIB_OBJS = $(patsubst $(LIB_DIR)/%,$(OBJ_DIR)/lib/%,$(LIB_FILES:.cu=.o))
+TEST_OBJS = $(patsubst $(TEST_DIR)/%,$(OBJ_DIR)/test/%,$(TEST_FILES:.cu=.o))
+
+# Trova tutte le sottodirectory in test/
+TESTS = $(shell find $(TEST_DIR) -mindepth 1 -maxdepth 1 -type d)
+TEST_BINS = $(patsubst $(TEST_DIR)/%, $(TEST_BIN_DIR)/%, $(TESTS))
 
 # Trova tutte le sottodirectory in lib e le aggiunge al percorso degli include
 INCLUDE_DIRS = $(shell find $(LIB_DIR) -type d)
 INCLUDE_FLAGS = $(addprefix -I, $(INCLUDE_DIRS)) -I$(LIB_DIR)
 
-# Compilatore e flags
-NVCC = nvcc
-NVCC_FLAGS = -O3 -lineinfo $(INCLUDE_FLAGS) -lcublas -arch=sm_80
-
 main: all
 
-# Crea le directory bin e obj se non esistono
+# Crea le directory necessarie
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
 
-$(OBJ_DIR):
-	mkdir -p $(OBJ_DIR)/src 
-
 # Regola di default
-all: $(BIN_DIR) $(OBJ_DIR) $(BIN_DIR)/$(TARGET)
+all: $(BIN_DIR)/$(TARGET)
 
-# Compilazione dei file oggetto dalla directory src (escludendo main.cu)
-$(OBJ_DIR)/src/%.o: $(SRC_DIR)/%.cu
-	$(NVCC) $(NVCC_FLAGS) -c $< -o $@
-
-# Compilazione del main separatamente
-$(OBJ_DIR)/src/main.o: $(SRC_DIR)/main.cu
+# Compilazione dei file oggetto dalla directory src
+$(SRC_OBJS): $(SRC_FILES)
+	@echo ""
+	@echo "Compiling src files..."
+	mkdir -p $(dir $@)
 	$(NVCC) $(NVCC_FLAGS) -c $< -o $@
 
 # Compilazione dei file oggetto dalle sottodirectory di lib
-$(OBJ_DIR)/lib/%/%.o: $(LIB_DIR)/%/%.cu
-	mkdir -p $(OBJ_DIR)/lib/$*
+$(LIB_OBJS): $(LIB_FILES)
+	@echo ""
+	@echo "Compiling lib files..."
+	mkdir -p $(dir $@)
 	$(NVCC) $(NVCC_FLAGS) -c $< -o $@
 
 # Link e generazione dell'eseguibile principale
-$(BIN_DIR)/$(TARGET): $(OBJ_DIR)/src/main.o $(SRC_OBJS) $(LIB_OBJS)
+$(BIN_DIR)/$(TARGET): $(SRC_OBJS) $(LIB_OBJS)
+	@echo ""
+	@echo "Linking..."
+	mkdir -p $(dir $@)
 	$(NVCC) $(NVCC_FLAGS) $^ -o $@
 
 # --------------------------------
 # Sezione per i test
 # --------------------------------
-
-# Trova tutte le sottodirectory in test/
-TESTS = $(shell find $(TEST_DIR) -mindepth 1 -maxdepth 1 -type d)
-TEST_BINS = $(patsubst $(TEST_DIR)/%, $(TEST_BIN_DIR)/%, $(TESTS))
 
 # Regola per creare tutti i test
 test: $(TEST_BIN_DIR) $(TEST_BINS)
@@ -71,9 +73,19 @@ test: $(TEST_BIN_DIR) $(TEST_BINS)
 $(TEST_BIN_DIR):
 	mkdir -p $(TEST_BIN_DIR)
 
-# Regola per compilare ogni test (senza src/main.o)
-$(TEST_BIN_DIR)/%: $(TEST_DIR)/% $(LIB_OBJS)
-	$(NVCC) $(NVCC_FLAGS) $(wildcard $</*.cu) $(LIB_OBJS) -o $@
+# Compilazione dei file oggetto dei test
+$(TEST_OBJS): $(TEST_FILES)
+	@echo ""
+	@echo "Compiling test files..."
+	mkdir -p $(dir $@)
+	$(NVCC) $(NVCC_FLAGS) -c $(filter %/$(patsubst %.o,%.cu, $(notdir $@)), $(TEST_FILES)) -o $@
+
+# Link e generazione dei binari dei test
+$(TEST_BINS): $(LIB_OBJS) $(TEST_OBJS)
+	@echo ""
+	@echo "Linking test..."
+	mkdir -p $(dir $@)
+	$(NVCC) $(NVCC_FLAGS) $(filter %/$(notdir $@).o, $(TEST_OBJS)) $(LIB_OBJS) -o $@
 
 # Pulizia dei file generati
 clean:
