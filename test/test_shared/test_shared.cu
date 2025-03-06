@@ -1,3 +1,11 @@
+/**!
+    @file   test_shared.cu
+    @brief  Test load and store from global to shared memory and viceversa
+
+    @author alanmasu
+    @date 06/03/2025
+*/
+
 #include <stdio.h>
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
@@ -94,7 +102,7 @@ int testShared(){
     int cSh = 0;
     
     //Testing block 0,0
-    printf("\n--------- TESTING BLOCK 0,0 ---------\n");
+    printf("\nTESTING BLOCK 0,0\n");
     err = cudaMemcpy(destinationHost, destination, size * size * sizeof(float), cudaMemcpyDeviceToHost);
     if(err != cudaSuccess){
         printf("[ERR]: Test shared memory FAILED -> due to failed copy from device to host (LINE: %d, FILE:%s)\n", __LINE__, __FILE__);
@@ -123,7 +131,7 @@ int testShared(){
     }
 
     // //Testing block 1,1
-    printf("\n--------- TESTING BLOCK 1,1 ---------\n");
+    printf("\nTESTING BLOCK 1,1\n");
     success = true;
     err = cudaMemcpy(destinationHost, destination2, size * size * sizeof(float), cudaMemcpyDeviceToHost);
     if(err != cudaSuccess){

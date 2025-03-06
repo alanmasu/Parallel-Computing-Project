@@ -139,12 +139,12 @@ __device__ void copyBlockToGlobal(const T *As, T *a, int r, int c, int n){
 }
 
 /*!
-    @brief      Function to perform batched matrix multiplication of two matrices A and B using CUDA tensor cores
+    @brief      Function that launch a kernel to perform batched matrix multiplication of two matrices A and B using CUDA tensor cores
     @details    Performing a batched matrix multiplication of two matrices A and B and storing the result in matrix C. 
                 The matrices are of size N x N.
     @param      A[in] Pointer to the first matrix in ROW MAJOR format, the matrix is allocated in DEVICE memory
     @param      B[in] Pointer to the second matrix in ROW MAJOR format, the matrix is allocated in DEVICE memory
-    @param      C[out] Pointer to the resultant matrix in ROW MAJOR format, the matrix is allocated in device memory
+    @param      C[out] Pointer to the resultant matrix in ROW MAJOR format, the matrix is allocated in DEVICE memory
     @param      N[in] Size of the row/column of the matrices
     @param      milliseconds[out] Time taken to perform the matrix multiplication
     @param      TFLOPS[out] Theoretical peak FLOPS achieved during the matrix multiplication
