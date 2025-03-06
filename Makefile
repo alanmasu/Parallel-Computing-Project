@@ -46,21 +46,21 @@ $(SRC_OBJS): $(SRC_FILES)
 	@echo ""
 	@echo "Compiling src files..."
 	mkdir -p $(dir $@)
-	$(NVCC) $(NVCC_FLAGS) -c $< -o $@
+	$(NVCC) $(NVCC_FLAGS) -dc -c $< -o $@
 
 # Compilazione dei file oggetto dalle sottodirectory di lib
 $(LIB_OBJS): $(LIB_FILES)
 	@echo ""
 	@echo "Compiling lib files..."
 	mkdir -p $(dir $@)
-	$(NVCC) $(NVCC_FLAGS) -c $< -o $@
+	$(NVCC) $(NVCC_FLAGS) -dc -c $< -o $@
 
 # Link e generazione dell'eseguibile principale
 $(BIN_DIR)/$(TARGET): $(LIB_OBJS) $(SRC_OBJS)
 	@echo ""
 	@echo "Linking..."
 	mkdir -p $(dir $@)
-	$(NVCC) $(NVCC_FLAGS) $^ -o $@
+	$(NVCC) $(NVCC_FLAGS) -dlink $^ -o $@
 
 # --------------------------------
 # Sezione per i test
@@ -78,14 +78,14 @@ $(TEST_OBJS): $(TEST_FILES)
 	@echo ""
 	@echo "Compiling test files..."
 	mkdir -p $(dir $@)
-	$(NVCC) $(NVCC_FLAGS) -c $(filter %/$(patsubst %.o,%.cu, $(notdir $@)), $(TEST_FILES)) -o $@
+	$(NVCC) $(NVCC_FLAGS) -dc -c $(filter %/$(patsubst %.o,%.cu, $(notdir $@)), $(TEST_FILES)) -o $@
 
 # Link e generazione dei binari dei test
 $(TEST_BINS): $(LIB_OBJS) $(TEST_OBJS)
 	@echo ""
 	@echo "Linking test..."
 	mkdir -p $(dir $@)
-	$(NVCC) $(NVCC_FLAGS) $(filter %/$(notdir $@).o, $(TEST_OBJS)) $(LIB_OBJS) -o $@
+	$(NVCC) $(NVCC_FLAGS) -dlink $(filter %/$(notdir $@).o, $(TEST_OBJS)) $(LIB_OBJS) -o $@
 
 # Pulizia dei file generati
 clean:

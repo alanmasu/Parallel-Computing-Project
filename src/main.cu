@@ -268,7 +268,7 @@ void testShared(){
     }
 
     //Calling the kernel
-    testSharedMemoryFunctions<<<1, 1024>>>(testDevice, destination, destination2, size);
+    // testSharedMemoryFunctions<<<1, 1024>>>(testDevice, destination, destination2, size);
 
     cudaDeviceSynchronize();
 

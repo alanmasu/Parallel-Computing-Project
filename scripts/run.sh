@@ -2,7 +2,7 @@
 #SBATCH --partition=edu5
 #SBATCH --nodes=1
 #SBATCH --tasks=1
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:0
 #SBATCH --cpus-per-task=1
 #SBATCH --time=00:05:00
 #SBATCH --job-name=test-project
@@ -16,5 +16,9 @@ module load cuda/12.1
 cd /home/alan.masutti/Project
 # git stash save "Stashing changes for Job Execution"
 # git checkout WMMA_MatMul_v1.0.1
-make test
-srun /home/alan.masutti/Project/build/bin/test/test_batched
+make 
+
+srun /home/alan.masutti/Project/build/bin/main
+# srun /home/alan.masutti/Project/build/bin/test/test_wmma
+# srun /home/alan.masutti/Project/build/bin/test/test_shared
+# srun /home/alan.masutti/Project/build/bin/test/test_batched

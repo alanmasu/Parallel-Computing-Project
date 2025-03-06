@@ -1,4 +1,11 @@
-//Simple Matrix Multiplication whit cuBLAS
+/*!
+    @file test_wmma.cu
+
+    @brief Test the __device__ function for block multiplication using WMMA
+    
+    @author alanmasu
+    @date 06/03/2025
+*/
 
 #include <stdio.h>
 #include <cuda_runtime.h>
@@ -11,6 +18,15 @@
 
 #define N 32
 
+/**!
+    @brief Kernel che chiama la funzione 'blockMatrixMul' per moltiplicare due blocchi BLOCK_SIZE x BLOCK_SIZE
+
+    @param a puntatore alla matrice A sul device
+    @param b puntatore alla matrice B sul device
+    @param d_c puntatore alla matrice C sul device
+    @param n dimensione delle matrici (in questo caso BLOCK_SIZE)
+
+*/
 __global__ void testBlockMatrixMul(half* a, half* b, float* d_c, int n){
     __shared__ half  As [SHARED_PAGE_COUNT * BLOCK_SIZE * BLOCK_SIZE];
     __shared__ half  Bs [SHARED_PAGE_COUNT * BLOCK_SIZE * BLOCK_SIZE];
@@ -23,7 +39,7 @@ __global__ void testBlockMatrixMul(half* a, half* b, float* d_c, int n){
     // __syncthreads();
 
     // wmmaMatrixMultiply(As, Bs, Cs, n);
-    // blockMatrixMul(As, Bs, Cs, BLOCK_SIZE);
+    blockMatrixMul(As, Bs, Cs, BLOCK_SIZE);
 
     //Attendi i thread dei primi 8 warp per completare la computazione
     __syncthreads();
