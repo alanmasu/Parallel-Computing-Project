@@ -86,6 +86,11 @@ To schedule the project you can use the following command:
 ```bash
 sbatch scripts/run.sh
 ```
+### Schedule tests
+To schedule the tests you can use the following command:
+```bash
+sbatch scripts/test.sh
+```
 
 ### Clean
 To clean the scheduler output you can use the following command:
