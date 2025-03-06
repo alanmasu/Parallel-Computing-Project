@@ -58,12 +58,18 @@ make
 ```
 This will compile the libraries and the src files and put the executable in the `build/bin` folder as `main`.
 
-#### Compiling tests
+### Compiling tests
 If you want to compile the tests you can use the following command:
 ```bash
 make test
 ```
 This will compile the tests and put the executables in the `build/bin/test` folder. It creates a test executable for each test folder in the `test` directory. Test are linked to the libraries object files.
+
+### Compiling all
+If you want to compile the project and the tests you can use the following command:
+```bash
+make all
+```
 
 ### Run
 To run, in an interactive session, the project you can use the following command:

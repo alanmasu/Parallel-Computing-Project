@@ -32,14 +32,14 @@ TEST_BINS = $(patsubst $(TEST_DIR)/%, $(TEST_BIN_DIR)/%, $(TESTS))
 INCLUDE_DIRS = $(shell find $(LIB_DIR) -type d)
 INCLUDE_FLAGS = $(addprefix -I, $(INCLUDE_DIRS)) -I$(LIB_DIR)
 
-main: all
+main: $(BIN_DIR)/$(TARGET)
 
 # Crea le directory necessarie
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
 
 # Regola di default
-all: $(BIN_DIR)/$(TARGET)
+all: main test
 
 # Compilazione dei file oggetto dalla directory src
 $(SRC_OBJS): $(SRC_FILES)
@@ -56,7 +56,7 @@ $(LIB_OBJS): $(LIB_FILES)
 	$(NVCC) $(NVCC_FLAGS) -c $< -o $@
 
 # Link e generazione dell'eseguibile principale
-$(BIN_DIR)/$(TARGET): $(SRC_OBJS) $(LIB_OBJS)
+$(BIN_DIR)/$(TARGET): $(LIB_OBJS) $(SRC_OBJS)
 	@echo ""
 	@echo "Linking..."
 	mkdir -p $(dir $@)
