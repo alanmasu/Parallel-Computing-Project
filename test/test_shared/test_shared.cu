@@ -167,5 +167,10 @@ int testShared(){
 int main(int argc, char **argv){
     int res = 0;
     res = testShared();
+    if (res == 0){
+        printf("--------- Test Shared PASSED ---------\n");
+    }else{
+        printf("--------- Test Shared FAILED ---------\n");
+    }
     return res;
 }

@@ -77,7 +77,7 @@ int main(int argc, char **argv){
     float *h_C_wmma = NULL;
 
     // // Allocazione delle matrici sull'host (CPU)
-    printf("\n--------- TESTING CODE ---------\n");
+    printf("\n--------- TESTING WMMA ---------\n");
     printf("[INFO]: Allocazione delle matrici sull'host\n");
     size_t matrix_size = N * N * sizeof(float);
     h_A = (float *)malloc(matrix_size);
@@ -238,7 +238,9 @@ int main(int argc, char **argv){
         d_C = NULL;
     }
     if(success){
+        printf("--------- Test WMMA PASSED ---------\n");
         return 0;
     }
+    printf("--------- Test WMMA FAILED ---------\n");
     return -1;
 }

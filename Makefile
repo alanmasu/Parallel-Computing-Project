@@ -60,7 +60,7 @@ $(BIN_DIR)/$(TARGET): $(LIB_OBJS) $(SRC_OBJS)
 	@echo ""
 	@echo "Linking..."
 	mkdir -p $(dir $@)
-	$(NVCC) $(NVCC_FLAGS) -dlink $^ -o $@
+	$(NVCC) $(NVCC_FLAGS) $^ -o $@
 
 # --------------------------------
 # Sezione per i test
@@ -85,7 +85,7 @@ $(TEST_BINS): $(LIB_OBJS) $(TEST_OBJS)
 	@echo ""
 	@echo "Linking test..."
 	mkdir -p $(dir $@)
-	$(NVCC) $(NVCC_FLAGS) -dlink $(filter %/$(notdir $@).o, $(TEST_OBJS)) $(LIB_OBJS) -o $@
+	$(NVCC) $(NVCC_FLAGS) $(filter %/$(notdir $@).o, $(TEST_OBJS)) $(LIB_OBJS) -o $@
 
 # Pulizia dei file generati
 clean:
