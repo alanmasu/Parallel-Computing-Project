@@ -1,4 +1,11 @@
-//Simple Matrix Multiplication whit cuBLAS
+/**!
+    @file test_batched.cu
+    @brief File per il testing delle funzionalità di batched matrix multiplication
+    @details Questo file esegue la moltiplicazione a blocchi a mano, per capire dove la funzione matMulTensorCore sbaglia
+
+    @author alanmasu
+    @date 06/03/2025
+*/
 
 #include <stdio.h>
 #include <cuda_runtime.h>
@@ -8,6 +15,7 @@
 #include <mma.h>
 #include <ctime>
 #include <Utilities.h>
+#include <math.h>
 
 #warning "TEST BATCHED"
 
@@ -19,6 +27,7 @@ using namespace nvcuda;
 
 /**!
     @brief Funzione per popolare una matrice bs x bs con valori equivalenti ad un blocco (bRow, bCol) di una matrice N x N
+    
     @param [out] A puntatore alla matrice da popolare
     @param bRow indice di riga del blocco
     @param bCol indice di colonna del blocco
@@ -29,16 +38,27 @@ void populateBlockOfMatrix(float *A, int bRow, int bCol, int bs, int size){
     for(int rowInsideBlock = 0; rowInsideBlock < bs; ++rowInsideBlock){
         for(int colInsideBlock = 0; colInsideBlock < bs; ++colInsideBlock){
             int item = (bRow * bs * size) + (bCol * bs) + (rowInsideBlock * size) + colInsideBlock;
-            A[rowInsideBlock * bs + colInsideBlock] = item;
+            if(rowInsideBlock * bs + colInsideBlock < bs * bs){
+                A[rowInsideBlock * bs + colInsideBlock] = item;
+            }
         }
     }
 }
 
-void testPopulateBlockOfMatrix(){
+int testPopulateBlockOfMatrix(){
     float a[2*2] = {-1.0};
+    // const float test[2*2] = {10.0, 11.0, 14.0, 15.0};
     populateBlockOfMatrix(a, 1, 1, 2, 4);
     printf("Matrice A:\n");
     printMat(a, 2,2);
+    // // For future implementation
+    // for (int i = 0; i < 2*2; ++i){
+    //     if(abs(a[i] - test[i]) > 0.00001){
+    //         printf("[ERR]: Errore nella popolazione della matrice => i was %d, a[i] was %f, test[i] was %f\n", i, a[i], test[i]);
+    //         return -1;
+    //     }
+    // }
+    return 0;
 }
 
 int testBlockMatrixMultiplication(){
@@ -51,11 +71,15 @@ int testBlockMatrixMultiplication(){
     // // Allocazione delle matrici sull'host (CPU)
     printf("\n--------- TESTING BLOC Marix Multiplication ---------\n");
     printf("[INFO]: Allocazione delle matrici sull'host\n");
-    size_t matrix_size = N * N * sizeof(float);
+    size_t matrix_size = BS * BS * sizeof(float);
     h_A = (float *)malloc(matrix_size);
     h_B = (float *)malloc(matrix_size);
     h_C_cublas = (float *)malloc(matrix_size);
     h_C_wmma = (float *)malloc(matrix_size);
+    if(h_A == NULL || h_B == NULL || h_C_cublas == NULL || h_C_wmma == NULL){
+        printf("[ERR]: Errore nell'allocazione delle matrici sull'host\n");
+        return 1;
+    }
     printf("[INFO]: Allocazione delle matrici sull'host completata\n");
 
     // //Allocazione sul device (GPU)
@@ -66,16 +90,95 @@ int testBlockMatrixMultiplication(){
     cudaError_t err2 = checkCudaError(cudaMalloc((void **)&d_B, matrix_size), "Allocazione matrice B su GPU");
     cudaError_t err3 = checkCudaError(cudaMalloc((void **)&d_C, matrix_size), "Allocazione matrice C su GPU");
 
+    if(err1 != cudaSuccess || err2 != cudaSuccess || err3 != cudaSuccess){
+        printf("[ERR]: Errore nell'allocazione delle matrici sulla GPU\n");
+        return 1;
+    }
+
     const int blockNumber = N / BS;
     
     for(int bRow = 0; bRow < blockNumber; ++bRow){
         for(int bCol = 0; bCol < blockNumber; ++bCol){
             printf("Block [%d, %d]\n", bRow, bCol);
             // Inizializza le matrici A e B sull'host
-            memset(h_A, 0, matrix_size);
-            memset(h_B, 0, matrix_size);
+            populateBlockOfMatrix(h_A, bRow, bCol, BS, N);
+            populateBlockOfMatrix(h_B, bRow, bCol, BS, N);
             memset(h_C_cublas, 0, matrix_size);
+            memset(h_C_wmma, 0, matrix_size);
             
+            cudaError_t err1 = checkCudaError(cudaMemcpy(d_A, h_A, matrix_size, cudaMemcpyHostToDevice), "Copia matrice A sulla GPU");
+            cudaError_t err2 = checkCudaError(cudaMemcpy(d_B, h_B, matrix_size, cudaMemcpyHostToDevice), "Copia matrice B sulla GPU");
+            cudaError_t err3 = checkCudaError(cudaMemcpy(d_C, h_C_wmma, matrix_size, cudaMemcpyHostToDevice), "Copia matrice C sulla GPU");
+            if(err1 != cudaSuccess || err2 != cudaSuccess || err3 != cudaSuccess){
+                printf("[ERR]: Errore nella copia delle matrici sulla GPU\n");
+                return 2;
+            }
+
+            //Indicatori di performance
+            float cublasMillis = 0;
+            double cublasTFLOPS = 0;
+            float myMillis = 0;
+            double myTFLOPS = 0;
+
+            ///////////////////// ALGORHITMs ///////////////////////
+            /////// cuBLAS ///////
+            // Moltiplicazione di matrici con cuBLAS
+            cublasMatMul(d_A, d_B, d_C, BS, &cublasMillis, &cublasTFLOPS);
+            // Copia dei risultati dalla GPU all'host
+            err1 = checkCudaError(cudaMemcpy(h_C_cublas, d_C, matrix_size, cudaMemcpyDeviceToHost), "Copia matrice C dall'host");
+            if(err1 != cudaSuccess){
+                printf("[ERR]: Errore nella copia della matrice C dall'host\n");
+                return 2;
+            }
+            err1 = checkCudaError(cudaMemcpy(d_C, h_C_wmma, matrix_size, cudaMemcpyHostToDevice), "Copia matrice C sulla GPU");
+            if(err1 != cudaSuccess){
+                printf("[ERR]: Errore nella copia della matrice C sulla GPU\n");
+                return 2;
+            }
+
+            // Converto in half
+            half* d_A_h = NULL;
+            half* d_B_h = NULL;
+            err1 = convertFloatToHalf(h_A, &d_A_h, BS);
+            err2 = convertFloatToHalf(h_B, &d_B_h, BS);
+            if(err1 != cudaSuccess || err2 != cudaSuccess){
+                printf("[ERR]: Errore nella conversione in half\n");
+                return 3;
+            }
+            tensorCoreMatMul(d_A_h, d_B_h, d_C, BS, &myMillis, &myTFLOPS);
+            err1 = checkCudaError(cudaMemcpy(h_C_wmma, d_C, matrix_size, cudaMemcpyDeviceToHost), "Copia matrice C dall'host");
+            if(err1 != cudaSuccess){
+                printf("[ERR]: Errore nella copia della matrice C dall'host\n");
+                return 2;
+            }
+
+            // Stampa delle matrici
+            printf("Matrice A:\n");
+            printNMat(h_A, 2, 2, BS);
+            printf("Matrice B:\n");
+            printNMat(h_B, 2, 2, BS);
+            printf("Matrice C WMMA:\n");
+            printNMat(h_C_wmma, 2, 2, BS);
+            printf("Matrice C cuBLAS:\n");
+            printNMat(h_C_cublas, 2, 2, BS);
+
+            printf("\nMatrice A half:\n");
+            printNMat(d_A_h, 2, 2, BS);
+            printf("Matrice B half:\n");
+            printNMat(d_B_h, 2, 2, BS);
+
+
+            // Controllo dei risultati
+            for(int i = 0; i < BS * BS; ++i){
+                if(abs(h_C_cublas[i] - h_C_wmma[i]) > 0.0001){
+                    printf("[ERR]: Errore nei risultati, blocco:[%d, %d] => h_C_cublas[%d] != h_C_wmma[%d] | %f != %f\n", bRow, bCol, i, i , h_C_cublas[i], h_C_wmma[i]);
+                    return -1;
+                }
+            }
+
+            // Deallocazione delle matrici half
+            cudaFree(d_A_h);
+            cudaFree(d_B_h);
         }
     }
     
@@ -94,18 +197,31 @@ int testBlockMatrixMultiplication(){
     }
 
     //Libero la memoria delle matrici sorgenti
-    if(err1 == cudaSuccess && err2 == cudaSuccess){
-        cudaFree(d_A);
-        cudaFree(d_B);
-        d_A = NULL;
-        d_B = NULL;
-    }
+    cudaFree(d_A);
+    cudaFree(d_B);
+    d_A = NULL;
+    d_B = NULL;
     return 0;
 }
 
 int main(int argc, char **argv){
-    testPopulateBlockOfMatrix();
-    // testBlockMatrixMultiplication();
+    int res = 0;
+    printf("\n--------- TESTING BATCHED ---------\n");
+
+    res = testPopulateBlockOfMatrix();
+    if(res != 0){
+        printf("[ERR]: testPopulateBlockOfMatrix FAILED\n");
+        printf("\n--------- TESTING BATCHED FAILED---------\n");
+        return res;
+    }
+    res = testBlockMatrixMultiplication();
+    if(res != 0){
+        printf("[ERR]: testBlockMatrixMultiplication FAILED\n");
+        printf("\n--------- TESTING BATCHED FAILED---------\n");
+        return res;
+    }
+    printf("\n--------- TESTING BATCHED PASSED---------\n");
+    return 0;
 
 }
 

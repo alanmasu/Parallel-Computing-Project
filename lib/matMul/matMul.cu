@@ -190,9 +190,9 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_
     const int blockRow = blockIdx.y;
     const int blockCol = blockIdx.x;
 
-    if(blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0){
-        printf("numPages: %d, numBlocks: %d\n", numPages, numBlocks);
-    }
+    // if(blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0){
+    //     printf("numPages: %d, numBlocks: %d\n", numPages, numBlocks);
+    // }
 
     // Ciclo sulle pagine
     for(int p = 0; p < numPages; ++p){
@@ -201,9 +201,9 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_
         const int blockSize = BLOCK_SIZE * BLOCK_SIZE;
 
         // Debug
-        if(threadIdx.x == 0){
-            printf("Page Offset: %d\n", pageOffset);
-        }
+        // if(threadIdx.x == 0){
+        //     printf("Page Offset: %d\n", pageOffset);
+        // }
         
         // Carica il blocco dalla matrice C in shared memory
         loadBlockToShared(d_c, Cs, blockRow, blockCol, n);
@@ -213,11 +213,11 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_
             // Carica i blocchi in shared memory
             loadBlockToShared(a, As + k * blockSize, blockRow, pageOffset + k, n);  
             loadBlockToShared(b, Bs + k * blockSize, pageOffset + k, blockCol, n);
-            if(blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0){
-                printf("k: %d\nBlock A[%d][%d]\nBlock B[%d][%d]\n",k, blockRow, pageOffset + k, pageOffset + k, blockCol);
-                printf("As[*][0]: %f\n"  , __half2float(As[k * blockSize + 1]));
-                printf("Bs[*][0]: %f\n\n", __half2float(Bs[k * blockSize + 1]));
-            }
+            // if(blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0){
+            //     printf("k: %d\nBlock A[%d][%d]\nBlock B[%d][%d]\n",k, blockRow, pageOffset + k, pageOffset + k, blockCol);
+            //     printf("As[*][0]: %f\n"  , __half2float(As[k * blockSize + 1]));
+            //     printf("Bs[*][0]: %f\n\n", __half2float(Bs[k * blockSize + 1]));
+            // }
             blockMatrixMul(As + k * blockSize, Bs + k * blockSize, Cs, BLOCK_SIZE);
 
             // Attendi i thread dei primi 8 warp per completare la computazione
@@ -235,6 +235,10 @@ cudaError_t convertFloatToHalf(const float *A, half **B, int N){
     half* h_B = (half*)malloc(N * N * sizeof(half));
     if(B == NULL){
         printf("[ERROR]: unable to convert float to half caused by B NULL pointer\n");
+        return cudaErrorInvalidValue;
+    }
+    if(A == NULL){
+        printf("[ERROR]: unable to convert float to half caused by A NULL pointer\n");
         return cudaErrorInvalidValue;
     }
     cudaError_t err = cudaMalloc((void **)B, N * N * sizeof(half));
