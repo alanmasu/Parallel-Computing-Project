@@ -162,10 +162,10 @@ int testBlockMatrixMultiplication(){
             printf("Matrice C cuBLAS:\n");
             printNMat(h_C_cublas, 2, 2, BS);
 
-            printf("\nMatrice A half:\n");
-            printNMat(d_A_h, 2, 2, BS);
-            printf("Matrice B half:\n");
-            printNMat(d_B_h, 2, 2, BS);
+            // printf("\nMatrice A half:\n");
+            // printNMat(d_A_h, 2, 2, BS);
+            // printf("Matrice B half:\n");
+            // printNMat(d_B_h, 2, 2, BS);
 
 
             // Controllo dei risultati
