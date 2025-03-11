@@ -49,6 +49,8 @@ The project folder is structured as follows:
 First step is to load the cuda module:
 ```bash
 module load cuda/12.1
+cd /path/to/project
+mkdir run
 ```
 
 ### Compile
