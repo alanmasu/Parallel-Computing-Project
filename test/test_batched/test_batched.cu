@@ -109,7 +109,7 @@ int testBlockMatrixMultiplication(){
                     int item = (bRow * BS * N) + (bCol * BS) + (row * N) + col;
                     if(row * BS + col < BS * BS){
                         h_A[row * BS + col] = row == col ? 1 : 0;
-                        h_B[row * BS + col] = item / 10.0;
+                        h_B[row * BS + col] = item / 1000.0;
                     }
                 }
             }

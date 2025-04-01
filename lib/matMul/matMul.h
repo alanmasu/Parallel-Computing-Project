@@ -79,7 +79,6 @@ void cublasMatMul(const float *d_A, const float *d_B, float *d_C, int N, float* 
     @return     cudaError_t Error code
 
 */
-
 cudaError_t convertFloatToHalf(const float *A, half **h_B, half **B, int N);
 
 #ifdef WMMA_BATCHED
