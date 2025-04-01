@@ -67,6 +67,7 @@ int testBlockMatrixMultiplication(){
     float *h_B = NULL;
     float *h_C_cublas = NULL;
     float *h_C_wmma = NULL;
+    bool success = true;
 
     // // Allocazione delle matrici sull'host (CPU)
     printf("\n--------- TESTING BLOC Marix Multiplication ---------\n");
@@ -101,8 +102,17 @@ int testBlockMatrixMultiplication(){
         for(int bCol = 0; bCol < blockNumber; ++bCol){
             printf("Block [%d, %d]\n", bRow, bCol);
             // Inizializza le matrici A e B sull'host
-            populateBlockOfMatrix(h_A, bRow, bCol, BS, N);
-            populateBlockOfMatrix(h_B, bRow, bCol, BS, N);
+            // populateBlockOfMatrix(h_A, bRow, bCol, BS, N);
+            // populateBlockOfMatrix(h_B, bRow, bCol, BS, N);
+            for (int row = 0; row < BS; ++row){
+                for(int col = 0; col < BS; ++col){
+                    int item = (bRow * BS * N) + (bCol * BS) + (row * N) + col;
+                    if(row * BS + col < BS * BS){
+                        h_A[row * BS + col] = row == col ? 1 : 0;
+                        h_B[row * BS + col] = item;
+                    }
+                }
+            }
             memset(h_C_cublas, 0, matrix_size);
             memset(h_C_wmma, 0, matrix_size);
             
@@ -153,14 +163,15 @@ int testBlockMatrixMultiplication(){
             }
 
             // Stampa delle matrici
-            printf("Matrice A:\n");
-            printNMat(h_A, 2, 2, BS);
-            printf("Matrice B:\n");
-            printNMat(h_B, 2, 2, BS);
-            printf("Matrice C WMMA:\n");
-            printNMat(h_C_wmma, 2, 2, BS);
-            printf("Matrice C cuBLAS:\n");
-            printNMat(h_C_cublas, 2, 2, BS);
+            const int toPrint = 4;
+            // printf("Matrice A:\n");
+            // printNMat(h_A, toPrint, toPrint, BS);
+            // printf("Matrice B:\n");
+            // printNMat(h_B, toPrint, toPrint, BS);
+            // printf("Matrice C WMMA:\n");
+            // printNMat(h_C_wmma, toPrint, toPrint, BS);
+            // printf("Matrice C cuBLAS:\n");
+            // printNMat(h_C_cublas, toPrint, toPrint, BS);
 
             // printf("\nMatrice A half:\n");
             // printNMat(d_A_h, 2, 2, BS);
@@ -170,16 +181,18 @@ int testBlockMatrixMultiplication(){
 
             // Controllo dei risultati
             for(int i = 0; i < BS * BS; ++i){
-                if(abs(h_C_cublas[i] - h_C_wmma[i]) > 0.0001){
+                // if(abs(h_C_cublas[i] - h_C_wmma[i]) > 0.0001){
+                if(h_C_cublas[i] != h_C_wmma[i]){
                     printf("[ERR]: Errore nei risultati, blocco:[%d, %d] => h_C_cublas[%d] != h_C_wmma[%d] | %f != %f\n", bRow, bCol, i, i , h_C_cublas[i], h_C_wmma[i]);
-                    return -1;
+                    success = false;
                 }
             }
-
+            
             // Deallocazione delle matrici half
             cudaFree(d_A_h);
             cudaFree(d_B_h);
         }
+        // return 0;
     }
     
     
@@ -201,6 +214,9 @@ int testBlockMatrixMultiplication(){
     cudaFree(d_B);
     d_A = NULL;
     d_B = NULL;
+    if(!success){
+        return -1;
+    }
     return 0;
 }
 

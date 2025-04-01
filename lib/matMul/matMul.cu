@@ -190,9 +190,15 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_
     const int blockRow = blockIdx.y;
     const int blockCol = blockIdx.x;
 
-    // if(blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0){
-    //     printf("numPages: %d, numBlocks: %d\n", numPages, numBlocks);
-    // }
+    if(blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0){
+        int toPrint = 4;
+        printf("Matrice A [from GPU]:\n");
+        printNMat(a, toPrint, toPrint, n);
+        printf("Matrice B [from GPU]:\n");
+        printNMat(b, toPrint, toPrint, n);
+    }
+    
+    __syncthreads();
 
     // Ciclo sulle pagine
     for(int p = 0; p < numPages; ++p){
@@ -207,12 +213,13 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_
         
         // Carica il blocco dalla matrice C in shared memory
         loadBlockToShared(d_c, Cs, blockRow, blockCol, n);
-
+        // __syncthreads();
         // Ciclo all'interno della pagina
         for(int k = 0; k < numBlocks; ++k){ 
             // Carica i blocchi in shared memory
             loadBlockToShared(a, As + k * blockSize, blockRow, pageOffset + k, n);  
             loadBlockToShared(b, Bs + k * blockSize, pageOffset + k, blockCol, n);
+            __syncthreads();
             // if(blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0){
             //     printf("k: %d\nBlock A[%d][%d]\nBlock B[%d][%d]\n",k, blockRow, pageOffset + k, pageOffset + k, blockCol);
             //     printf("As[*][0]: %f\n"  , __half2float(As[k * blockSize + 1]));
@@ -220,10 +227,26 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_
             // }
             blockMatrixMul(As + k * blockSize, Bs + k * blockSize, Cs, BLOCK_SIZE);
 
+            __syncthreads();
+            
+            if(threadIdx.x == 0){
+                printf("block:[%d, %d] k: %d\nMatrice Cs:\n", blockRow, blockCol, k);
+                printNMat(Cs, 4, 4, n);
+            }
+
             // Attendi i thread dei primi 8 warp per completare la computazione
             __syncthreads();
 
-            Cs[blockSize + threadIdx.x] += Cs[threadIdx.x + BLOCK_SIZE * BLOCK_SIZE];
+            Cs[blockSize + threadIdx.x] += Cs[threadIdx.x];
+
+            __syncthreads();
+
+            if(threadIdx.x == 0){
+                printf("\nCs after sum:\n", blockRow, blockCol, k);
+                printNMat(Cs + blockSize, 4, 4, n);
+            }
+
+            __syncthreads();
         }
         copyBlockToGlobal(Cs + blockSize, d_c, blockCol, blockRow, n);
     }
@@ -267,8 +290,8 @@ void tensorCoreMatMul(const half *d_A, const half *d_B, float *d_C, int n, float
     }
 
     // Configura la griglia e i blocchi per la computazione
-    dim3 threadsPerBlock(32, 32);
-    dim3 numBlocks(n / TILE_SIZE, n / TILE_SIZE);
+    dim3 threadsPerBlock(THREADS_PER_BLOCK * THREADS_PER_BLOCK);
+    dim3 numBlocks(n / BLOCK_SIZE, n / BLOCK_SIZE);
 
     // Misurazione del tempo
     cudaEvent_t start, stop;
@@ -298,6 +321,6 @@ void tensorCoreMatMul(const half *d_A, const half *d_B, float *d_C, int n, float
     if(milliseconds != NULL && TFLOPS != NULL){
         *TFLOPS = (FLOPs / (*milliseconds / 1000.0)) / 1e12;
     }else{
-        printf("some pointers are NULL\n");
+        printf("[ERROR]: some pointers are NULL\n");
     }
 }

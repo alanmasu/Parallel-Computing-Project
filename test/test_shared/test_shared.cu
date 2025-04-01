@@ -13,6 +13,7 @@
 #include <ctime>
 #include <Utilities.h>
 
+#warning "TESTING SHARED MEMORY"
 
 /**!
     @brief      Function to perform a multiplication between two block of matrices using shared memory
