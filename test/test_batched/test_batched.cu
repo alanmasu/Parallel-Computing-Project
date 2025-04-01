@@ -21,8 +21,6 @@
 
 using namespace nvcuda;
 
-#define N 64
-#define BS 32
 
 
 /**!
@@ -62,6 +60,8 @@ int testPopulateBlockOfMatrix(){
 }
 
 int testBlockMatrixMultiplication(){
+    const int SIZE_COUNT = 4;
+    int sizes[SIZE_COUNT] = {32, 64, 256, 2048};
     // Puntatori per le matrici sull'host
     float *h_A = NULL;
     float *h_B = NULL;
@@ -70,156 +70,132 @@ int testBlockMatrixMultiplication(){
     bool success = true;
 
     // // Allocazione delle matrici sull'host (CPU)
-    printf("\n--------- TESTING BLOC Marix Multiplication ---------\n");
-    printf("[INFO]: Allocazione delle matrici sull'host\n");
-    size_t matrix_size = BS * BS * sizeof(float);
-    h_A = (float *)malloc(matrix_size);
-    h_B = (float *)malloc(matrix_size);
-    h_C_cublas = (float *)malloc(matrix_size);
-    h_C_wmma = (float *)malloc(matrix_size);
-    if(h_A == NULL || h_B == NULL || h_C_cublas == NULL || h_C_wmma == NULL){
-        printf("[ERR]: Errore nell'allocazione delle matrici sull'host\n");
-        return 1;
-    }
-    printf("[INFO]: Allocazione delle matrici sull'host completata\n");
+    printf("\n--------- TESTING BLOCK Marix Multiplication ---------\n");
+    for(int size = 0; size < SIZE_COUNT; ++size){
+        int N = sizes[size];
+        printf("[INFO]: Allocazione delle matrici sull'host -> N: %d\n", N);
+        size_t matrix_size = N * N * sizeof(float);
+        h_A = (float *)malloc(matrix_size);
+        h_B = (float *)malloc(matrix_size);
+        h_C_cublas = (float *)malloc(matrix_size);
+        h_C_wmma = (float *)malloc(matrix_size);
+        if(h_A == NULL || h_B == NULL || h_C_cublas == NULL || h_C_wmma == NULL){
+            printf("[ERR]: Errore nell'allocazione delle matrici sull'host\n");
+            return 1;
+        }
+        printf("[INFO]: Allocazione delle matrici sull'host completata\n");
 
-    // //Allocazione sul device (GPU)
-    float *d_A = NULL;
-    float *d_B = NULL;
-    float *d_C = NULL;
-    cudaError_t err1 = checkCudaError(cudaMalloc((void **)&d_A, matrix_size), "Allocazione matrice A su GPU");
-    cudaError_t err2 = checkCudaError(cudaMalloc((void **)&d_B, matrix_size), "Allocazione matrice B su GPU");
-    cudaError_t err3 = checkCudaError(cudaMalloc((void **)&d_C, matrix_size), "Allocazione matrice C su GPU");
+        // //Allocazione sul device (GPU)
+        float *d_A = NULL;
+        float *d_B = NULL;
+        float *d_C = NULL;
+        cudaError_t err1 = checkCudaError(cudaMalloc((void **)&d_A, matrix_size), "Allocazione matrice A su GPU");
+        cudaError_t err2 = checkCudaError(cudaMalloc((void **)&d_B, matrix_size), "Allocazione matrice B su GPU");
+        cudaError_t err3 = checkCudaError(cudaMalloc((void **)&d_C, matrix_size), "Allocazione matrice C su GPU");
 
-    if(err1 != cudaSuccess || err2 != cudaSuccess || err3 != cudaSuccess){
-        printf("[ERR]: Errore nell'allocazione delle matrici sulla GPU\n");
-        return 1;
-    }
+        if(err1 != cudaSuccess || err2 != cudaSuccess || err3 != cudaSuccess){
+            printf("[ERR]: Errore nell'allocazione delle matrici sulla GPU\n");
+            return 1;
+        }
 
-    const int blockNumber = N / BS;
-    
-    for(int bRow = 0; bRow < blockNumber; ++bRow){
-        for(int bCol = 0; bCol < blockNumber; ++bCol){
-            printf("Block [%d, %d]\n", bRow, bCol);
-            // Inizializza le matrici A e B sull'host
-            // populateBlockOfMatrix(h_A, bRow, bCol, BS, N);
-            // populateBlockOfMatrix(h_B, bRow, bCol, BS, N);
-            for (int row = 0; row < BS; ++row){
-                for(int col = 0; col < BS; ++col){
-                    int item = (bRow * BS * N) + (bCol * BS) + (row * N) + col;
-                    if(row * BS + col < BS * BS){
-                        h_A[row * BS + col] = row == col ? 1 : 0;
-                        h_B[row * BS + col] = item / 1000.0;
-                    }
-                }
+        for (int row = 0; row < N; ++row){
+            for(int col = 0; col < N; ++col){
+                h_A[row * N + col] = row == col ? 1 : 0;
+                h_B[row * N + col] = (row * N + col) / 1000.0;
             }
-            memset(h_C_cublas, 0, matrix_size);
-            memset(h_C_wmma, 0, matrix_size);
+        }
+        memset(h_C_cublas, 0, matrix_size);
+        memset(h_C_wmma, 0, matrix_size);
             
-            cudaError_t err1 = checkCudaError(cudaMemcpy(d_A, h_A, matrix_size, cudaMemcpyHostToDevice), "Copia matrice A sulla GPU");
-            cudaError_t err2 = checkCudaError(cudaMemcpy(d_B, h_B, matrix_size, cudaMemcpyHostToDevice), "Copia matrice B sulla GPU");
-            cudaError_t err3 = checkCudaError(cudaMemcpy(d_C, h_C_wmma, matrix_size, cudaMemcpyHostToDevice), "Copia matrice C sulla GPU");
-            if(err1 != cudaSuccess || err2 != cudaSuccess || err3 != cudaSuccess){
-                printf("[ERR]: Errore nella copia delle matrici sulla GPU\n");
-                return 2;
+        err1 = checkCudaError(cudaMemcpy(d_A, h_A, matrix_size, cudaMemcpyHostToDevice), "Copia matrice A sulla GPU");
+        err2 = checkCudaError(cudaMemcpy(d_B, h_B, matrix_size, cudaMemcpyHostToDevice), "Copia matrice B sulla GPU");
+        err3 = checkCudaError(cudaMemcpy(d_C, h_C_wmma, matrix_size, cudaMemcpyHostToDevice), "Copia matrice C sulla GPU");
+        if(err1 != cudaSuccess || err2 != cudaSuccess || err3 != cudaSuccess){
+            printf("[ERR]: Errore nella copia delle matrici sulla GPU\n");
+            return 2;
+        }
+
+        //Indicatori di performance
+        float cublasMillis = 0;
+        double cublasTFLOPS = 0;
+        float myMillis = 0;
+        double myTFLOPS = 0;
+
+        ///////////////////// ALGORHITMs ///////////////////////
+        /////// cuBLAS ///////
+        // Moltiplicazione di matrici con cuBLAS
+        cublasMatMul(d_A, d_B, d_C, N, &cublasMillis, &cublasTFLOPS);
+        // Copia dei risultati dalla GPU all'host
+        err1 = checkCudaError(cudaMemcpy(h_C_cublas, d_C, matrix_size, cudaMemcpyDeviceToHost), "Copia matrice C dall'host");
+        if(err1 != cudaSuccess){
+            printf("[ERR]: Errore nella copia della matrice C dall'host\n");
+            return 2;
+        }
+        err1 = checkCudaError(cudaMemcpy(d_C, h_C_wmma, matrix_size, cudaMemcpyHostToDevice), "Copia matrice C sulla GPU");
+        if(err1 != cudaSuccess){
+            printf("[ERR]: Errore nella copia della matrice C sulla GPU\n");
+            return 2;
+        }
+
+        // Converto in half
+        half* h_A_h = NULL;
+        half* h_B_h = NULL;
+        half* d_A_h = NULL;
+        half* d_B_h = NULL;
+        err1 = convertFloatToHalf(h_A, &h_A_h, &d_A_h, N);
+        err2 = convertFloatToHalf(h_B, &h_B_h, &d_B_h, N);
+        if(err1 != cudaSuccess || err2 != cudaSuccess){
+            printf("[ERR]: Errore nella conversione in half\n");
+            return 3;
+        }
+        tensorCoreMatMul(d_A_h, d_B_h, d_C, N, &myMillis, &myTFLOPS);
+        err1 = checkCudaError(cudaMemcpy(h_C_wmma, d_C, matrix_size, cudaMemcpyDeviceToHost), "Copia matrice C dall'host");
+        if(err1 != cudaSuccess){
+            printf("[ERR]: Errore nella copia della matrice C dall'host\n");
+            return 2;
+        }
+
+        // Controllo dei risultati
+        for(int i = 0; i < N * N; ++i){
+            // if(abs(h_C_cublas[i] - h_C_wmma[i]) > 0.0001){
+            if(__half2float(h_B_h[i]) != h_C_wmma[i]){
+                printf("[ERR]: Errore nei risultati => size: %d, h_C_cublas[%d] != h_C_wmma[%d] | %f != %f\n", N, i, i , h_C_cublas[i], h_C_wmma[i]);
+                success = false;
+                break;
             }
+        }
 
-            //Indicatori di performance
-            float cublasMillis = 0;
-            double cublasTFLOPS = 0;
-            float myMillis = 0;
-            double myTFLOPS = 0;
-
-            ///////////////////// ALGORHITMs ///////////////////////
-            /////// cuBLAS ///////
-            // Moltiplicazione di matrici con cuBLAS
-            cublasMatMul(d_A, d_B, d_C, BS, &cublasMillis, &cublasTFLOPS);
-            // Copia dei risultati dalla GPU all'host
-            err1 = checkCudaError(cudaMemcpy(h_C_cublas, d_C, matrix_size, cudaMemcpyDeviceToHost), "Copia matrice C dall'host");
-            if(err1 != cudaSuccess){
-                printf("[ERR]: Errore nella copia della matrice C dall'host\n");
-                return 2;
-            }
-            err1 = checkCudaError(cudaMemcpy(d_C, h_C_wmma, matrix_size, cudaMemcpyHostToDevice), "Copia matrice C sulla GPU");
-            if(err1 != cudaSuccess){
-                printf("[ERR]: Errore nella copia della matrice C sulla GPU\n");
-                return 2;
-            }
-
-            // Converto in half
-            half* h_A_h = NULL;
-            half* h_B_h = NULL;
-            half* d_A_h = NULL;
-            half* d_B_h = NULL;
-            err1 = convertFloatToHalf(h_A, &h_A_h, &d_A_h, BS);
-            err2 = convertFloatToHalf(h_B, &h_B_h, &d_B_h, BS);
-            if(err1 != cudaSuccess || err2 != cudaSuccess){
-                printf("[ERR]: Errore nella conversione in half\n");
-                return 3;
-            }
-            tensorCoreMatMul(d_A_h, d_B_h, d_C, BS, &myMillis, &myTFLOPS);
-            err1 = checkCudaError(cudaMemcpy(h_C_wmma, d_C, matrix_size, cudaMemcpyDeviceToHost), "Copia matrice C dall'host");
-            if(err1 != cudaSuccess){
-                printf("[ERR]: Errore nella copia della matrice C dall'host\n");
-                return 2;
-            }
-
-            // Stampa delle matrici
-            const int toPrint = 4;
-            // printf("Matrice A:\n");
-            // printNMat(h_A, toPrint, toPrint, BS);
-            // printf("Matrice B:\n");
-            // printNMat(h_B, toPrint, toPrint, BS);
-            // printf("Matrice C WMMA:\n");
-            // printNMat(h_C_wmma, toPrint, toPrint, BS);
-            // printf("Matrice C cuBLAS:\n");
-            // printNMat(h_C_cublas, toPrint, toPrint, BS);
-
-            // printf("\nMatrice A half:\n");
-            // printNMat(d_A_h, 2, 2, BS);
-            // printf("Matrice B half:\n");
-            // printNMat(d_B_h, 2, 2, BS);
-
-
-            // Controllo dei risultati
-            for(int i = 0; i < BS * BS; ++i){
-                // if(abs(h_C_cublas[i] - h_C_wmma[i]) > 0.0001){
-                if(__half2float(h_B_h[i]) != h_C_wmma[i]){
-                    printf("[ERR]: Errore nei risultati, blocco:[%d, %d] => h_C_cublas[%d] != h_C_wmma[%d] | %f != %f\n", bRow, bCol, i, i , h_C_cublas[i], h_C_wmma[i]);
-                    success = false;
-                }
-            }
-            
-            // Deallocazione delle matrici half
-            cudaFree(d_A_h);
-            cudaFree(d_B_h);
+        // Libera la memoria sull'host
+        if(h_A != NULL && h_B != NULL && h_C_cublas != NULL && h_C_wmma != NULL && h_A_h != NULL && h_B_h != NULL){
+            free(h_A);
+            free(h_B);
+            free(h_C_cublas);
+            free(h_C_wmma);
             free(h_A_h);
             free(h_B_h);
+
+            h_A = NULL;
+            h_B = NULL;
+            h_C_cublas = NULL;
+            h_C_wmma = NULL;
+            h_A_h = NULL;
+            h_B_h = NULL;
         }
-        // return 0;
-    }
-    
-    
-    // Libera la memoria sull'host
-    if(h_A != NULL && h_B != NULL && h_C_cublas != NULL && h_C_wmma != NULL){
-        free(h_A);
-        free(h_B);
-        free(h_C_cublas);
-        free(h_C_wmma);
 
-        h_A = NULL;
-        h_B = NULL;
-        h_C_cublas = NULL;
-        h_C_wmma = NULL;
-    }
-
-    //Libero la memoria delle matrici sorgenti
-    cudaFree(d_A);
-    cudaFree(d_B);
-    d_A = NULL;
-    d_B = NULL;
-    if(!success){
-        return -1;
+        //Libero la memoria delle matrici sorgenti
+        cudaFree(d_A);
+        cudaFree(d_B);
+        cudaFree(d_A_h);
+        cudaFree(d_B_h);
+        d_A = NULL;
+        d_B = NULL;
+        d_A_h = NULL;
+        d_B_h = NULL;
+        if(!success){
+            return -1;
+        }else{
+            printf("[INFO]: Test size %d PASSED\n\n", N);
+        }
     }
     return 0;
 }

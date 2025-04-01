@@ -183,22 +183,23 @@ __device__ void blockMatrixMul(const half *a, const half *b, float *c, int n){
 __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_c, int n) {
     __shared__ half  As [SHARED_PAGE_COUNT * BLOCK_SIZE * BLOCK_SIZE];
     __shared__ half  Bs [SHARED_PAGE_COUNT * BLOCK_SIZE * BLOCK_SIZE];
-    __shared__ float  Cs [2 * BLOCK_SIZE * BLOCK_SIZE];
+    __shared__ float Cs [BLOCK_SIZE * BLOCK_SIZE];
+    __shared__ float Acc[BLOCK_SIZE * BLOCK_SIZE]; 
 
     const int numPages = n / (SHARED_PAGE_COUNT * 32) || 1;                   // 32 è il numero di elementi per pagina di shared memory
     const int numBlocks = numPages < 2 ? n / BLOCK_SIZE : SHARED_PAGE_COUNT;  // Se la matrice è piccola non tutti i blocchi di shared memory sono utilizzati
     const int blockRow = blockIdx.y;
     const int blockCol = blockIdx.x;
 
-    if(blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0){
-        int toPrint = 4;
-        printf("Matrice A [from GPU]:\n");
-        printNMat(a, toPrint, toPrint, n);
-        printf("Matrice B [from GPU]:\n");
-        printNMat(b, toPrint, toPrint, n);
-    }
+    // if(blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0){
+    //     int toPrint = 4;
+    //     printf("Matrice A [from GPU]:\n");
+    //     printNMat(a, toPrint, toPrint, n);
+    //     printf("Matrice B [from GPU]:\n");
+    //     printNMat(b, toPrint, toPrint, n);
+    // }
     
-    __syncthreads();
+    // __syncthreads();
 
     // Ciclo sulle pagine
     for(int p = 0; p < numPages; ++p){
@@ -212,43 +213,53 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_
         // }
         
         // Carica il blocco dalla matrice C in shared memory
-        loadBlockToShared(d_c, Cs, blockRow, blockCol, n);
+        // clearBlockToShared(Cs + blockSize);
         // __syncthreads();
         // Ciclo all'interno della pagina
         for(int k = 0; k < numBlocks; ++k){ 
             // Carica i blocchi in shared memory
-            loadBlockToShared(a, As + k * blockSize, blockRow, pageOffset + k, n);  
-            loadBlockToShared(b, Bs + k * blockSize, pageOffset + k, blockCol, n);
-            __syncthreads();
-            // if(blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0){
-            //     printf("k: %d\nBlock A[%d][%d]\nBlock B[%d][%d]\n",k, blockRow, pageOffset + k, pageOffset + k, blockCol);
-            //     printf("As[*][0]: %f\n"  , __half2float(As[k * blockSize + 1]));
-            //     printf("Bs[*][0]: %f\n\n", __half2float(Bs[k * blockSize + 1]));
-            // }
-            blockMatrixMul(As + k * blockSize, Bs + k * blockSize, Cs, BLOCK_SIZE);
-
-            __syncthreads();
+            loadBlockToShared(a, As, blockRow, pageOffset + k, n);  
+            loadBlockToShared(b, Bs, pageOffset + k, blockCol, n);
+            loadBlockToShared(d_c, Cs, blockRow, blockCol, n);
             
-            if(threadIdx.x == 0){
-                printf("block:[%d, %d] k: %d\nMatrice Cs:\n", blockRow, blockCol, k);
-                printNMat(Cs, 4, 4, n);
+            if(blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0){
+                printf("As whit k = %d - Block[%d, %d]:\n", k, blockRow, pageOffset + k);
+                printNMat(As, 4, 4, BLOCK_SIZE);
+                printf("Bs whit k = %d - Block[%d, %d]:\n", k, pageOffset + k, blockCol);
+                printNMat(Bs, 4, 4, BLOCK_SIZE);
+                printf("\n");
             }
 
-            // Attendi i thread dei primi 8 warp per completare la computazione
-            __syncthreads();
+            __syncthreads();    // Attendi il caricamento dei blocchi in shared memory
 
-            Cs[blockSize + threadIdx.x] += Cs[threadIdx.x];
+            blockMatrixMul(As, Bs, Cs, BLOCK_SIZE);
+  
+            __syncthreads();    // Attendi i thread dei primi 8 warp per completare la computazione
 
-            __syncthreads();
-
-            if(threadIdx.x == 0){
-                printf("\nCs after sum:\n", blockRow, blockCol, k);
-                printNMat(Cs + blockSize, 4, 4, n);
+            if(blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0){
+                printf("Partial C whit k = %d:\n", k);
+                printNMat(Cs, 4, 4, BLOCK_SIZE);
             }
+            __syncthreads();    // Attendi il completamento della stampa
 
+            Acc[threadIdx.x] = Acc[threadIdx.x] + Cs[threadIdx.x];
             __syncthreads();
+
+            if(blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0){
+                printf("Matrice C after sum with k = %d:\n", k);
+                printNMat(Acc, 4, 4, BLOCK_SIZE);
+                printf("\n");
+            }
+            __syncthreads();
+
         }
-        copyBlockToGlobal(Cs + blockSize, d_c, blockCol, blockRow, n);
+        // if(blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0){
+        //     printf("Matrice C after com:\n", k);
+        //     printNMat(Cs + blockSize, 4, 4, n);
+        // }
+        // __syncthreads();
+
+        copyBlockToGlobal(Acc, d_c, blockCol, blockRow, n);
     }
 }
 #endif // WMMA_BATCHED

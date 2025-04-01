@@ -117,6 +117,21 @@ __device__ void loadBlockToShared(const T *a, T *As, int r, int c, int n){
 }
 
 /**! 
+    @brief Funzione per azzerare un blocco di matrice in shared memory
+
+    @param a puntatore alla matrice in shared memory
+    @param BS dimensione del blocco
+*/
+template <typename T>
+__device__ void clearBlockToShared(T *a, int BS = BLOCK_SIZE){
+    int threadID = threadIdx.x;
+    
+    if(threadID < BS * BS){
+        a[threadID] = 0;
+    }
+}
+
+/**! 
     @brief Funzione per copiare un blocco di matrice in global memory
 
     @param As puntatore alla matrice in shared memory
