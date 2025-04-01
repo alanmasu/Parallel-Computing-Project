@@ -109,7 +109,7 @@ int testBlockMatrixMultiplication(){
                     int item = (bRow * BS * N) + (bCol * BS) + (row * N) + col;
                     if(row * BS + col < BS * BS){
                         h_A[row * BS + col] = row == col ? 1 : 0;
-                        h_B[row * BS + col] = item;
+                        h_B[row * BS + col] = item / 10.0;
                     }
                 }
             }
@@ -147,10 +147,12 @@ int testBlockMatrixMultiplication(){
             }
 
             // Converto in half
+            half* h_A_h = NULL;
+            half* h_B_h = NULL;
             half* d_A_h = NULL;
             half* d_B_h = NULL;
-            err1 = convertFloatToHalf(h_A, &d_A_h, BS);
-            err2 = convertFloatToHalf(h_B, &d_B_h, BS);
+            err1 = convertFloatToHalf(h_A, &h_A_h, &d_A_h, BS);
+            err2 = convertFloatToHalf(h_B, &h_B_h, &d_B_h, BS);
             if(err1 != cudaSuccess || err2 != cudaSuccess){
                 printf("[ERR]: Errore nella conversione in half\n");
                 return 3;
@@ -182,7 +184,7 @@ int testBlockMatrixMultiplication(){
             // Controllo dei risultati
             for(int i = 0; i < BS * BS; ++i){
                 // if(abs(h_C_cublas[i] - h_C_wmma[i]) > 0.0001){
-                if(h_C_cublas[i] != h_C_wmma[i]){
+                if(__half2float(h_B_h[i]) != h_C_wmma[i]){
                     printf("[ERR]: Errore nei risultati, blocco:[%d, %d] => h_C_cublas[%d] != h_C_wmma[%d] | %f != %f\n", bRow, bCol, i, i , h_C_cublas[i], h_C_wmma[i]);
                     success = false;
                 }
@@ -191,6 +193,8 @@ int testBlockMatrixMultiplication(){
             // Deallocazione delle matrici half
             cudaFree(d_A_h);
             cudaFree(d_B_h);
+            free(h_A_h);
+            free(h_B_h);
         }
         // return 0;
     }

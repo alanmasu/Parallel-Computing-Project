@@ -72,6 +72,7 @@ void cublasMatMul(const float *d_A, const float *d_B, float *d_C, int N, float* 
                 memory for B on the device. The matrices are of size N x N.
 
     @param      A[in] Pointer to the float matrix, allocated in host memory
+    @param      h_B[out] Double pointer of the half matrix, will be allocated in host memory
     @param      B[out] Double pointer of the half matrix, will be allocated in device memory
     @param      N[in] Size of the row/column of the matrices
 
@@ -79,7 +80,7 @@ void cublasMatMul(const float *d_A, const float *d_B, float *d_C, int N, float* 
 
 */
 
-cudaError_t convertFloatToHalf(const float *A, half **B, int N);
+cudaError_t convertFloatToHalf(const float *A, half **h_B, half **B, int N);
 
 #ifdef WMMA_BATCHED
 /**! 

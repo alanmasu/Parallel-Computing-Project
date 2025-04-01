@@ -158,17 +158,19 @@ int main(int argc, char **argv){
     }
 
     /////// Custom Kernel ///////
-    half* d_A_half = NULL;
-    half* d_B_half = NULL;
-    
-    // Allocazione delle matrici sul device e conversione in half
+    half* h_A_h = NULL;
+    half* h_B_h = NULL;
+    half* d_A_h = NULL;
+    half* d_B_h = NULL;
     printf("[INFO]: Allocazione delle matrici half A e B sulla GPU\n");
-    err1 = convertFloatToHalf(h_A, &d_A_half, N);
-    err2 = convertFloatToHalf(h_B, &d_B_half, N);
+
+    // Allocazione delle matrici sul device e conversione in half
+    err1 = convertFloatToHalf(h_A, &h_A_h, &d_A_h, N);
+    err2 = convertFloatToHalf(h_B, &h_B_h, &d_B_h, N);
     if(err1 != cudaSuccess || err2 != cudaSuccess){
         printf("[ERR]: Errore nell'allocazione e conversione delle matrici in half\n");
-        d_A_half = NULL;
-        d_B_half = NULL;
+        d_A_h = NULL;
+        d_B_h = NULL;
         return 1;
     }else{
         printf("[INFO]: Allocazione delle matrici half A e B sulla GPU completata\n");
@@ -181,7 +183,7 @@ int main(int argc, char **argv){
 
     dim3 blocks = dim3(N/BLOCK_SIZE, N/BLOCK_SIZE);
     dim3 threads = dim3(THREADS_PER_BLOCK * THREADS_PER_BLOCK);
-    testBlockMatrixMul<<<blocks, threads>>>(d_A_half, d_B_half, d_C, N);
+    testBlockMatrixMul<<<blocks, threads>>>(d_A_h, d_B_h, d_C, N);
 
     // Copia dei risultati dalla GPU all'host
     checkCudaError(cudaMemcpy(h_C_wmma, d_C, matrix_size, cudaMemcpyDeviceToHost), "Copia matrice C dal device");
@@ -230,11 +232,13 @@ int main(int argc, char **argv){
 
     // Libera la memoria sulla GPU
     if(err1 == cudaSuccess && err2 == cudaSuccess && err3 == cudaSuccess){
-        cudaFree(d_A_half);
-        cudaFree(d_B_half);
+        free(h_A_h);
+        free(h_B_h);
+        cudaFree(d_A_h);
+        cudaFree(d_B_h);
         cudaFree(d_C);
-        d_A_half = NULL;
-        d_B_half = NULL;
+        d_A_h = NULL;
+        d_B_h = NULL;
         d_C = NULL;
     }
     if(success){

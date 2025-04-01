@@ -254,8 +254,16 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_
 #endif // WMMA_BATCHED
 
 
-cudaError_t convertFloatToHalf(const float *A, half **B, int N){
-    half* h_B = (half*)malloc(N * N * sizeof(half));
+cudaError_t convertFloatToHalf(const float *A, half **h_B,  half **B, int N){
+    if(h_B == NULL){
+        printf("[ERROR]: unable to convert float to half caused by h_B NULL pointer\n");
+        return cudaErrorInvalidValue;
+    }
+    *h_B = (half*)malloc(N * N * sizeof(half));
+    if(*h_B == NULL){
+        printf("[ERROR]: unable to convert float to half caused by h_B allocation\n");
+        return cudaErrorMemoryAllocation;
+    }
     if(B == NULL){
         printf("[ERROR]: unable to convert float to half caused by B NULL pointer\n");
         return cudaErrorInvalidValue;
@@ -267,10 +275,10 @@ cudaError_t convertFloatToHalf(const float *A, half **B, int N){
     cudaError_t err = cudaMalloc((void **)B, N * N * sizeof(half));
     if(h_B != NULL && err == cudaSuccess){
         for(int i = 0; i < N * N; ++i){
-            h_B[i] = __float2half(A[i]);
+            (*h_B)[i] = __float2half(A[i]);
         }
-        err = cudaMemcpy(*B, h_B, N * N * sizeof(half), cudaMemcpyHostToDevice);
-        free(h_B);
+        err = cudaMemcpy(*B, *h_B, N * N * sizeof(half), cudaMemcpyHostToDevice);
+        // free(h_B);
     }else{
         printf("[ERROR]: unable to allocate memory for half matrix\n");
     }
