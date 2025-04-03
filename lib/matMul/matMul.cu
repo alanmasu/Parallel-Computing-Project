@@ -114,11 +114,13 @@ void cublasMatMul(const float *d_A, const float *d_B, float *d_C, int n, float* 
 #define WMMA_N 16
 
 /**! 
-    @brief Funzione per la moltiplicazione di blocchi BLOCK_SIZE x BLOCK_SIZE
-    @details La funzione prende in ingresso i puntatori alle matrici e moltiplica i due blocchi 
-    @param a [in] puntatore alla matrice A in shared memory
-    @param b [in] puntatore alla matrice B in shared memory
-    @param c [out] puntatore alla matrice C in shared memory
+    @brief      Funzione per la moltiplicazione di blocchi BLOCK_SIZE x BLOCK_SIZE
+    @details    La funzione prende in ingresso i puntatori alle matrici e moltiplica i due blocchi 
+    @param[in]  a puntatore alla matrice A in shared memory
+    @param[in]  b puntatore alla matrice B in shared memory
+    @param[out] c puntatore a due matrici BLOCK_SIZE x BLOCK_SIZE allocate in shared memory 
+                  dove memorizzare i due risultati parziali
+
     @param n dimensione delle matrici
 */
 __device__ void blockMatrixMul(const half *a, const half *b, float *c, int n){
@@ -169,25 +171,30 @@ __device__ void blockMatrixMul(const half *a, const half *b, float *c, int n){
         // Carica i fragment
         wmma::load_matrix_sync(a_frag,   a + cRow + aCol, BLOCK_SIZE);
         wmma::load_matrix_sync(b_frag,   b + bRow + cCol, BLOCK_SIZE);
-        wmma::load_matrix_sync(acc_frag, c + cRow + cCol, BLOCK_SIZE, wmma::mem_row_major);
-        // wmma::fill_fragment(acc_frag, 0.0f);
+        // wmma::load_matrix_sync(acc_frag, c + cRow + cCol, BLOCK_SIZE, wmma::mem_row_major);
+        wmma::fill_fragment(acc_frag, 0.0f);
 
         // Moltiplica i fragment
         wmma::mma_sync(acc_frag, a_frag, b_frag, acc_frag);
 
         // Memorizza il risultato
         wmma::store_matrix_sync(c + cRow + cCol + cPage, acc_frag, BLOCK_SIZE, wmma::mem_row_major);
+        if(cRow + cCol + cPage >= 2 * BLOCK_SIZE * BLOCK_SIZE){
+            printf("Thread %d is writing after bounds", threadIdx.x);
+        }
     }
 }
 
 __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_c, int n) {
-    __shared__ half  As [SHARED_PAGE_COUNT * BLOCK_SIZE * BLOCK_SIZE];
-    __shared__ half  Bs [SHARED_PAGE_COUNT * BLOCK_SIZE * BLOCK_SIZE];
+    const int blockSize = BLOCK_SIZE * BLOCK_SIZE;
+
+    __shared__ half  As [SHARED_PAGE_COUNT * blockSize];
+    __shared__ half  Bs [SHARED_PAGE_COUNT * blockSize];
     // __shared__ float Cs [BLOCK_SIZE * BLOCK_SIZE];
     // __shared__ float Acc [BLOCK_SIZE * BLOCK_SIZE];
     extern __shared__ float sharedMem[]; 
     float *Cs = sharedMem; // La matrice Cs è allocata in shared memory
-    float *Acc = sharedMem + BLOCK_SIZE * BLOCK_SIZE; // La matrice Acc è allocata in shared memory
+    float *Acc = sharedMem + 2 * (blockSize); // La matrice Acc è allocata in shared memory
 
     const int numPages = n / (SHARED_PAGE_COUNT * 32) || 1;                   // 32 è il numero di elementi per pagina di shared memory
     const int numBlocks = numPages < 2 ? n / BLOCK_SIZE : SHARED_PAGE_COUNT;  // Se la matrice è piccola non tutti i blocchi di shared memory sono utilizzati
@@ -196,12 +203,14 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_
 
     
     // __syncthreads();
-
+    // Inizializza la matrice Acc a zero
+    clearBlockToShared(Cs);
+    clearBlockToShared(Cs + blockSize);
+    clearBlockToShared(Acc);
     // Ciclo sulle pagine
     for(int p = 0; p < numPages; ++p){
         // Carica la riga di blocchi della matrice A in shared memory
         const int pageOffset = p * SHARED_PAGE_COUNT;  // Calcola l'offset della pagina in numero di blocchi
-        const int blockSize = BLOCK_SIZE * BLOCK_SIZE;
         
         // Carica il blocco dalla matrice C in shared memory
         // clearBlockToShared(Cs + blockSize);
@@ -236,7 +245,7 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_
             }
             __syncthreads();    // Attendi il completamento della stampa
 
-            Acc[threadIdx.x] = Acc[threadIdx.x] + Cs[threadIdx.x];
+            Acc[threadIdx.x] = Acc[threadIdx.x] + Cs[threadIdx.x] + Cs[threadIdx.x + blockSize];
             __syncthreads();    // Attendi il completamento della somma
             
             clearBlockToShared(Cs);
@@ -314,7 +323,7 @@ void tensorCoreMatMul(const half *d_A, const half *d_B, float *d_C, int n, float
     cudaEventRecord(start, 0);
     
     // Esegui il kernel per la moltiplicazione di matrici con Tensor Cores e WMMA
-    matrixMultiplyTensorCore<<<numBlocks, threadsPerBlock, 2 * BLOCK_SIZE * BLOCK_SIZE * sizeof(float)>>>(d_A, d_B, d_C, n);
+    matrixMultiplyTensorCore<<<numBlocks, threadsPerBlock, 3 * BLOCK_SIZE * BLOCK_SIZE * sizeof(float)>>>(d_A, d_B, d_C, n);
     
     // Ferma il timer
     cudaEventRecord(stop, 0);
