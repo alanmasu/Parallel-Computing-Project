@@ -225,7 +225,7 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_
             
             __syncthreads();    // Attendi il caricamento dei blocchi in shared memory
             
-            if(blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0){
+            if(blockIdx.x ==1 && blockIdx.y == 0 && threadIdx.x == 0){
                 printf("As whit k = %d - Block[%d, %d]:\n", k, blockRow, pageOffset + k);
                 printNMat(As, 4, 4, BLOCK_SIZE);
                 printf("Bs whit k = %d - Block[%d, %d]:\n", k, pageOffset + k, blockCol);
@@ -237,7 +237,7 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_
             blockMatrixMul(As, Bs, Cs, BLOCK_SIZE);
             __syncthreads();    // Attendi i thread dei primi 8 warp per completare la computazione
 
-            if(blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0){
+            if(blockIdx.x ==1 && blockIdx.y == 0 && threadIdx.x == 0){
                 printf("Acc prima della somma:\n");
                 printNMat(Acc, 4, 4, BLOCK_SIZE);
                 printf("Partial Cs whit k = %d:\n", k);
@@ -251,7 +251,7 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_
             clearBlockToShared(Cs);
             __syncthreads();
 
-            if(blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0){
+            if(blockIdx.x ==1 && blockIdx.y == 0 && threadIdx.x == 0){
                 printf("Matrice Acc after sum with k = %d:\n", k);
                 printNMat(Acc, 4, 4, BLOCK_SIZE);
                 printf("\n");
@@ -259,7 +259,7 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_
             __syncthreads();
         }
 
-        copyBlockToGlobal(Acc, d_c, blockCol, blockRow, n);
+        copyBlockToGlobal(Acc, d_c, blockRow, blockCol, n);
         __syncthreads();
 
     }
