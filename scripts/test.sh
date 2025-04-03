@@ -18,6 +18,6 @@ cd /home/alan.masutti/Project
 # git checkout WMMA_MatMul_v1.0.1
 make test
 
-# srun /home/alan.masutti/Project/build/bin/test/test_wmma
-# srun /home/alan.masutti/Project/build/bin/test/test_shared
+srun /home/alan.masutti/Project/build/bin/test/test_wmma
+srun /home/alan.masutti/Project/build/bin/test/test_shared
 srun /home/alan.masutti/Project/build/bin/test/test_batched

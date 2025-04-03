@@ -71,6 +71,11 @@ int testBlockMatrixMultiplication(){
 
     // // Allocazione delle matrici sull'host (CPU)
     printf("\n--------- TESTING BLOCK Marix Multiplication ---------\n");
+    
+    int smemSize = 0;
+    cudaDeviceGetAttribute(&smemSize, cudaDevAttrMaxSharedMemoryPerBlock, 0);
+    printf("shared memory ammount: %d\n", smemSize);
+
     for(int size = 0; size < SIZE_COUNT; ++size){
         int N = sizes[size];
         printf("[INFO]: Allocazione delle matrici sull'host -> N: %d\n", N);
