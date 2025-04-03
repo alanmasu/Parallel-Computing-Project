@@ -20,12 +20,10 @@
     @details    This function tests the shared memory functions by copying the source matrix to the destination matrix
                 using shared memory
 */
-__global__ void testSharedMemoryFunctions(float* source, float* destination00, float* destination11, int size){
+__global__ void testSharedMemoryFunctions(float* source, float* destination, int size){
     __shared__ float sharedMem[32 * 32];
-    loadBlockToShared(source, sharedMem, 0, 0, size);
-    copyBlockToGlobal(sharedMem, destination00, 0, 0, size);
-    loadBlockToShared(source, sharedMem, 1, 1, size);
-    copyBlockToGlobal(sharedMem, destination11, 1, 1, size);
+    loadBlockToShared(source,       sharedMem,      blockIdx.y, blockIdx.x, size);
+    copyBlockToGlobal(sharedMem,    destination,    blockIdx.y, blockIdx.x, size);
 }
 
 
@@ -34,15 +32,12 @@ int testShared(){
 
     //Sizes
     const int size = 64;
-    const int bs = 32;
-
 
     //Testing shared memory
     float* test = NULL;
     float* testDevice = NULL;
     float* destination = NULL;
-    float* destination2 = NULL;
-    float* destinationHost = NULL;
+    float* destinationDevice = NULL;
 
     
     test = (float*)malloc(size * size * sizeof(float));
@@ -52,8 +47,8 @@ int testShared(){
         return 1;
     }
 
-    destinationHost = (float*)malloc(size * size * sizeof(float));
-    if(destinationHost == NULL){
+    destination = (float*)malloc(size * size * sizeof(float));
+    if(destination == NULL){
         printf("[ERR]: Test shared memory FAILED -> due to failed allocation on host (LINE: %d, FILE:%s)\n", __LINE__, __FILE__);
         return 1;
     }
@@ -66,20 +61,12 @@ int testShared(){
         printf("testDevice: %p\n", testDevice);
     }
 
-    err = cudaMalloc((void**)&destination, size * size * sizeof(float));
+    err = cudaMalloc((void**)&destinationDevice, size * size * sizeof(float));
     if(err != cudaSuccess){
         printf("[ERR]: Test shared memory FAILED -> due to failed allocation on device (LINE: %d, FILE:%s)\n", __LINE__, __FILE__);
         return 1;
     }else{
-        printf("destination: %p\n", destination);
-    }
-
-    err = cudaMalloc((void**)&destination2, size * size * sizeof(float));
-    if(err != cudaSuccess){
-        printf("[ERR]: Test shared memory FAILED -> due to failed allocation on device (LINE: %d, FILE:%s)\n", __LINE__, __FILE__);
-        return 1;
-    }else{
-        printf("destination2: %p\n", destination2);
+        printf("destination: %p\n", destinationDevice);
     }
 
     for(int i = 0; i < size * size; i++){
@@ -93,74 +80,31 @@ int testShared(){
     }
 
     //Calling the kernel
-    testSharedMemoryFunctions<<<1, 1024>>>(testDevice, destination, destination2, size);
+    dim3 blocks(2,2);
+    testSharedMemoryFunctions<<<blocks, 1024>>>(testDevice, destinationDevice, size);
 
     cudaDeviceSynchronize();
 
     //For testing
     bool success = true;
-    int rSh = 0;
-    int cSh = 0;
-    
+
     //Testing block 0,0
     printf("\nTESTING BLOCK 0,0\n");
-    err = cudaMemcpy(destinationHost, destination, size * size * sizeof(float), cudaMemcpyDeviceToHost);
+    err = cudaMemcpy(destination, destinationDevice, size * size * sizeof(float), cudaMemcpyDeviceToHost);
     if(err != cudaSuccess){
         printf("[ERR]: Test shared memory FAILED -> due to failed copy from device to host (LINE: %d, FILE:%s)\n", __LINE__, __FILE__);
         printf("\tError: %s\n\tDescription: %s\n", cudaGetErrorName(err), cudaGetErrorString(err));
         return 2;
     }else{
-        rSh = 0;
-        for(int r = 0; r < 32; ++r){
-            for(int c = 0; c < 32; ++c){
-                if(test[r * size + c] != destinationHost[r * size + c]){
-                    printf("[ERR]: Test shared memory FAILED -> test[%d] != destinationHost[%d]: %f != %f \t\t(LINE: %d, FILE:%s)\n", r * size + c, rSh * bs + cSh, test[r * size + c], destinationHost[rSh * bs + cSh],__LINE__, __FILE__);
-                    success = false;
-                    break;
-                }
-            }
-            if(!success){
+        for(int i = 0; i < size * size; i++){
+            if(test[i] != destination[i]){
+                printf("[ERR]: Test shared memory FAILED -> test[%d] != destination[%d]: %f != %f \t\t(LINE: %d, FILE:%s)\n", i, i, test[i], destination[i],__LINE__, __FILE__);
+                success = false;
                 break;
             }
         }
     }
-    if(success){
-        printf("[INFO]: Test shared memory (block 0,0) PASSED\n");
-    }else{
-        printf("[ERR]: Test shared memory (block 0,0) FAILED\n");
-        return -1;
-    }
-
-    // //Testing block 1,1
-    printf("\nTESTING BLOCK 1,1\n");
-    success = true;
-    err = cudaMemcpy(destinationHost, destination2, size * size * sizeof(float), cudaMemcpyDeviceToHost);
-    if(err != cudaSuccess){
-        printf("[ERR]: Test shared memory FAILED -> due to failed copy from device to host (LINE: %d, FILE:%s)\n", __LINE__, __FILE__);
-        printf("\tError: %s\n\tDescription: %s\n", cudaGetErrorName(err), cudaGetErrorString(err));
-    }else{
-        printf("\n");
-        rSh = 0;
-        for(int r = 32; r < 64; ++r){
-            for(int c = 32; c < 64; ++c){
-                if(test[r * size + c] != destinationHost[r * size + c]){
-                    printf("[ERR]: Test shared memory FAILED -> test[%d] != destinationHost[%d]: %f != %f \t\t(LINE: %d, FILE:%s)\n", r * size + c, rSh * bs + cSh, test[r * size + c], destinationHost[rSh * bs + cSh],__LINE__, __FILE__);
-                    success = false;
-                    break;
-                }
-            }
-            if(!success){
-                break;
-            }
-        }
-    }
-    if(success){
-        printf("[INFO]: Test shared memory (block 1,1) PASSED\n\n");
-    }else{
-        printf("[ERR]: Test shared memory (block 1,1) FAILED\n\n");
-        return -1;
-    }
-
+    
     if(test != NULL){
         free(test);
     }
@@ -168,7 +112,16 @@ int testShared(){
         cudaFree(testDevice);
     }
     if(destination != NULL){
-        cudaFree(destination);
+        free(destination);
+    }
+    if(destinationDevice != NULL){
+        cudaFree(destinationDevice);
+    }
+    if(success){
+        printf("[INFO]: Test shared memory PASSED\n");
+    }else{
+        printf("[ERR]: Test shared memory FAILED\n");
+        return -1;
     }
     return 0;
 }
