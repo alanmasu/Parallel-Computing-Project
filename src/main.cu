@@ -121,13 +121,15 @@ int main(int argc, char **argv) {
         }
 
         /////// Custom Kernel ///////
+        half* h_A_half = NULL;
+        half* h_B_half = NULL;
         half* d_A_half = NULL;
         half* d_B_half = NULL;
         
         // Allocazione delle matrici sul device e conversione in half
         printf("[INFO]: Allocazione delle matrici half A e B sulla GPU\n");
-        err1 = convertFloatToHalf(h_A, &d_A_half, N);
-        err2 = convertFloatToHalf(h_B, &d_B_half, N);
+        err1 = convertFloatToHalf(h_A, &h_A_half, &d_A_half, N);
+        err2 = convertFloatToHalf(h_B, &h_B_half, &d_B_half, N);
         if(err1 != cudaSuccess || err2 != cudaSuccess){
             printf("[ERR]: Errore nell'allocazione e conversione delle matrici in half\n");
             d_A_half = NULL;
@@ -136,7 +138,6 @@ int main(int argc, char **argv) {
             printf("[INFO]: Allocazione delle matrici half A e B sulla GPU completata\n");
         }
 
-    #ifndef WMMA_BATCHED
         // Moltiplicazione di matrici con kernel custom
         tensorCoreMatMul(d_A_half, d_B_half, d_C, N, &myMillis, &myTFLOPS);
         // Salva i risultati su file
@@ -147,22 +148,7 @@ int main(int argc, char **argv) {
             printf("%d,%f,%f,%d,%f,%f\n", N, cublasMillis, cublasTFLOPS, 16, myMillis, myTFLOPS);
             printf("[/CSV]\n");
         }
-    #else
-        for(int bs = 16; bs <= 256 && bs < N; bs *= 2){
-            // const int bs = 32;
-            printf("\nStarting run with block size: %d\n", bs);
-            // Moltiplicazione di matrici con kernel custom
-            tensorCoreMatMul(d_A_half, d_B_half, d_C, N, bs, &myMillis, &myTFLOPS);
-            // Salva i risultati su file
-            if(resultFile != NULL){
-                fprintf(resultFile, "%d,%f,%f,%d,%f,%f\n", N, cublasMillis, cublasTFLOPS, bs, myMillis, myTFLOPS);
-            }else{
-                printf("[CSV]:\n");
-                printf("%d,%f,%f,%d,%f,%f\n", N, cublasMillis, cublasTFLOPS, bs, myMillis, myTFLOPS);
-                printf("[/CSV]\n");
-            }
-        }
-    #endif
+    
         // Libera la memoria sull'host
         if(h_A != NULL && h_B != NULL && h_C != NULL){
             free(h_A);
