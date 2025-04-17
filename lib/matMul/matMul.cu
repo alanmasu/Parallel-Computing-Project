@@ -6,6 +6,10 @@
 #include <mma.h>
 #include <Utilities.h>
 
+#ifdef CUDA_PROFILING
+    #include <cuda_profiler_api.h>
+#endif
+
 using namespace nvcuda;
 
 void serialMatMul(const float *A, const float *B, float *C, int N){
@@ -290,6 +294,11 @@ void tensorCoreMatMul(const half *d_A, const half *d_B, float *d_C, int n, float
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
+   
+    // Avvia il profiling CUDA
+    #ifdef CUDA_PROFILING
+        cudaProfilerStart();
+    #endif
 
     // Avvia il timer
     cudaEventRecord(start, 0);
@@ -301,12 +310,21 @@ void tensorCoreMatMul(const half *d_A, const half *d_B, float *d_C, int n, float
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
 
+    // Ferma il profiling CUDA
+    #ifdef CUDA_PROFILING
+        cudaProfilerStop();
+    #endif
+
     // Calcola il tempo impiegato
     if(milliseconds != NULL){
         *milliseconds = 0;
         cudaEventElapsedTime(milliseconds, start, stop);
     }
     
+    //Cancella gli eventi
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+
     // Numero totale di operazioni in virgola mobile (FLOP)
     double FLOPs = 2.0 * n * n * n;
 

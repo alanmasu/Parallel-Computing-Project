@@ -98,3 +98,8 @@ cleanbuild:
 
 # Pulizia più approfondita
 cleanall: clean cleanbuild
+
+# Regola per il profiling
+NVCC_FLAGS_PROFILE = $(NVCC_FLAGS) -DN_RUNS=1 -DSIZE_END=8192 -DCUDA_PROFILING
+profile: 
+	$(MAKE) NVCC_FLAGS="$(NVCC_FLAGS_PROFILE)" main
