@@ -23,7 +23,9 @@
 __global__ void testSharedMemoryFunctions(float* source, float* destination, int size){
     __shared__ float sharedMem[32 * 32];
     loadBlockToShared(source,       sharedMem,      blockIdx.y, blockIdx.x, size);
+    __syncthreads();
     copyBlockToGlobal(sharedMem,    destination,    blockIdx.y, blockIdx.x, size);
+    __syncthreads();
 }
 
 
@@ -88,8 +90,7 @@ int testShared(){
     //For testing
     bool success = true;
 
-    //Testing block 0,0
-    printf("\nTESTING BLOCK 0,0\n");
+    printf("\nTESTING COPY\n");
     err = cudaMemcpy(destination, destinationDevice, size * size * sizeof(float), cudaMemcpyDeviceToHost);
     if(err != cudaSuccess){
         printf("[ERR]: Test shared memory FAILED -> due to failed copy from device to host (LINE: %d, FILE:%s)\n", __LINE__, __FILE__);
