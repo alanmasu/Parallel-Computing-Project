@@ -296,7 +296,7 @@ void tensorCoreMatMul(const half *d_A, const half *d_B, float *d_C, int n, float
     cudaEventCreate(&stop);
    
     // Avvia il profiling CUDA
-    #ifdef CUDA_PROFILING
+    #ifdef CUDA_PROFILING_ONLY_MY
         cudaProfilerStart();
     #endif
 
@@ -311,7 +311,7 @@ void tensorCoreMatMul(const half *d_A, const half *d_B, float *d_C, int n, float
     cudaEventSynchronize(stop);
 
     // Ferma il profiling CUDA
-    #ifdef CUDA_PROFILING
+    #ifdef CUDA_PROFILING_ONLY_MY
         cudaProfilerStop();
     #endif
 
