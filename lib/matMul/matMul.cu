@@ -1,3 +1,12 @@
+/**!
+    @file matMul.cu
+    @author Alan Masutti (@alanmasu)
+
+    @brief Implementation of matrix multiplication using CUDA and cuBLAS.
+    @details This file contains the implementation of matrix multiplication using CUDA Cores and Tensor Cores.
+             It includes functions for serial matrix multiplication, cuBLAS matrix multiplication, and Tensor Core matrix multiplication.
+             The code also includes error handling for CUDA and cuBLAS operations.
+*/
 #include "matMul.h"
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
@@ -12,6 +21,7 @@
 
 using namespace nvcuda;
 
+//DOC OK
 void serialMatMul(const float *A, const float *B, float *C, int N){
     for(int r = 0; r < N; ++r){
         for(int c = 0; c < N; ++c){
@@ -22,7 +32,15 @@ void serialMatMul(const float *A, const float *B, float *C, int N){
     }
 }
 
-//Funzione di stampa, oveloaded from template function for half type
+/*!
+    @brief Function to print a matrix of type half
+    @details This function is a specialized version for printing matrices of type half.
+             It converts each element to float correct printing them to console.
+    @param[in] mat Pointer to the matrix of type half
+    @param[in] rows Number of rows in the matrix to print
+    @param[in] cols Number of columns in the matrix to print
+    @param[in] N The size of the matrix (N x N)
+*/
 __host__ __device__ void printNMat(const half* mat, int rows, int cols, int N) {
     printf("Printing half matrix\n");
     for (int i = 0; i < rows; ++i) {
@@ -33,7 +51,7 @@ __host__ __device__ void printNMat(const half* mat, int rows, int cols, int N) {
     }
 }
 
-// Funzione helper per il controllo degli errori CUDA
+//DOC OK
 cudaError_t checkCudaError(cudaError_t err, const char *msg) {
     if (err != cudaSuccess) {
         printf("CUDA error: %s: %s\n", msg, cudaGetErrorString(err));
@@ -42,15 +60,14 @@ cudaError_t checkCudaError(cudaError_t err, const char *msg) {
     return err;
 }
 
-// Funzione helper per il controllo degli errori cuBLAS
+//DOC OK
 void checkCublasError(cublasStatus_t status, const char *msg) {
     if (status != CUBLAS_STATUS_SUCCESS) {
         printf("cuBLAS error: %s\n", msg);
-        //exit(EXIT_FAILURE);
     }
 }
 
-// Funzione per la moltiplicazione di matrici su GPU con cuBLAS
+//DOC OK
 void cublasMatMul(const float *d_A, const float *d_B, float *d_C, int n, float* milliseconds, double* TFLOPS){
     if(d_A != NULL && d_B != NULL && d_C != NULL){
         float alpha = 1.0f, beta = 0.0f;
@@ -105,7 +122,6 @@ void cublasMatMul(const float *d_A, const float *d_B, float *d_C, int n, float* 
 }
 
 
-// Kernel per la moltiplicazione di matrici usando i Cuda Cores oppure i Tensor Cores
 #ifndef WMMA_BATCHED
     /**!
         @brief Funzione per la moltiplicazione di matrici con Cuda Cores a blocchi di BLOCK_SIZE x BLOCK_SIZE
@@ -117,16 +133,7 @@ void cublasMatMul(const float *d_A, const float *d_B, float *d_C, int n, float* 
 
 #define WMMA_N 16
 
-/**! 
-    @brief      Funzione per la moltiplicazione di blocchi BLOCK_SIZE x BLOCK_SIZE
-    @details    La funzione prende in ingresso i puntatori alle matrici e moltiplica i due blocchi 
-    @param[in]  a puntatore alla matrice A in shared memory
-    @param[in]  b puntatore alla matrice B in shared memory
-    @param[out] c puntatore a due matrici BLOCK_SIZE x BLOCK_SIZE allocate in shared memory 
-                  dove memorizzare i due risultati parziali
-
-    @param n dimensione delle matrici
-*/
+//DOC OK
 __device__ void blockMatrixMul(const half *a, const half *b, float *c, int n){
     
     //Creazione dei fragment
@@ -186,6 +193,15 @@ __device__ void blockMatrixMul(const half *a, const half *b, float *c, int n){
     }
 }
 
+/*!
+    @brief      Kernel to compute GEMM using Tensor Cores and WMMA
+    @details    The kernel computes the matrix multiplication using Tensor Cores and WMMA.
+                It uses shared memory to load the blocks of matrices A and B, and computes the
+                result in shared memory. The result is then copied back to global memory.
+    @param[in]  a pointer to the matrix A in global memory 
+    @param[in]  b pointer to the matrix B in global memory
+    @param[out] d_c pointer to the matrix C in global memory where the result is stored
+*/
 __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_c, int n) {
     const int blockSize = BLOCK_SIZE * BLOCK_SIZE;
 
@@ -242,7 +258,7 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_
 }
 #endif // WMMA_BATCHED
 
-
+//DOC OK
 cudaError_t convertFloatToHalf(const float *A, half **h_B,  half **B, int N){
     if(h_B == NULL){
         printf("[ERROR]: unable to convert float to half caused by h_B NULL pointer\n");
@@ -274,7 +290,7 @@ cudaError_t convertFloatToHalf(const float *A, half **h_B,  half **B, int N){
     return err;
 }
 
-// Funzione per la moltiplicazione di matrici su GPU con Tensor Cores e WMMA
+//DOC OK
 void tensorCoreMatMul(const half *d_A, const half *d_B, float *d_C, int n, float* milliseconds, double* TFLOPS) {
     
     if(d_A == NULL || d_B == NULL || d_C == NULL){
