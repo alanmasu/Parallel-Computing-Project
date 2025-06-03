@@ -1,4 +1,4 @@
-module load Python
+# module load Python
 python3 -m venv graphEnv
 source graphEnv/bin/activate
 # export PYTHONPATH=$PWD/graphEnv/lib/python3.8/site-packages:$PYTHONPATH

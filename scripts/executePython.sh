@@ -1,7 +1,10 @@
 #!/bin/bash
 # This script is used to execute a Python script in a specific environment
 # Usage: source executePython.sh <script_name> <args>
+#ENV_SCRIPT="${PWD}/utils/env-configuration.sh"
 PYTHON_ENV="${PWD}/graphEnv/bin/activate"
+
+# source $ENV_SCRIPT
 
 # Activate the Python environment
 source $PYTHON_ENV
@@ -21,7 +24,7 @@ fi
 python3 $1 "${@:2}"
 
 # Find __pycache__ directories and remove them
-find . -type d -name "__pycache__" -exec rm -rf {} +
+# find . -type d -name "__pycache__" -exec rm -rf {} +
 
 # Deactivate the Python environment
 deactivate

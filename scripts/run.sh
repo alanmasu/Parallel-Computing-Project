@@ -1,16 +1,14 @@
 #!/bin/bash
-#SBATCH --partition=edu5
+#SBATCH --partition=edu-medium
 #SBATCH --nodes=1
 #SBATCH --tasks=1
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:a30.24:1
 #SBATCH --cpus-per-task=1
-#SBATCH --time=00:05:00
+#SBATCH --time=00:10:00
+
 #SBATCH --job-name=test-project
 #SBATCH --output=run/test-project-%j.out
 #SBATCH --error=run/test-project-%j.err
-
-#SBATCH --mail-user=alan.masutti@studenti.unitn.it
-#SBATCH --mail-type=ALL
 
 module load cuda/12.1
 cd /home/alan.masutti/Project
