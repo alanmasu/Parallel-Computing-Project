@@ -12,7 +12,7 @@
 #define BLOCK_SIZE 32
 
 #ifndef THREADS_PER_BLOCK
-    #define THREADS_PER_BLOCK 32
+    #define THREADS_PER_BLOCK 256
 #endif
 
 #define SHARED_PAGE_COUNT 8
@@ -105,14 +105,17 @@ __device__ void blockMatrixMul(const half *a, const half *b, float *c, int n);
 */
 template <typename T>
 __device__ void loadBlockToShared(const T *a, T *As, int r, int c, int n){
-    int threadID = threadIdx.x;
-    int colInsideBlock = threadID % BLOCK_SIZE;
-    int rowInsideBlock = threadID / BLOCK_SIZE * n;
-    int blockColOffset = c * BLOCK_SIZE;
-    int blockRowOffset = r * BLOCK_SIZE * n;
-    int element = colInsideBlock + blockColOffset + rowInsideBlock + blockRowOffset;
-    if(element < n * n){
-        As[threadID] = a[element];
+    int iteration = (BLOCK_SIZE * BLOCK_SIZE) / THREADS_PER_BLOCK;       
+    for (int i = 0; i < iteration; ++i){
+        int threadID = threadIdx.x + i * THREADS_PER_BLOCK;
+        int colInsideBlock = threadID % BLOCK_SIZE;
+        int rowInsideBlock = threadID / BLOCK_SIZE * n;
+        int blockColOffset = c * BLOCK_SIZE;
+        int blockRowOffset = r * BLOCK_SIZE * n;
+        int element = colInsideBlock + blockColOffset + rowInsideBlock + blockRowOffset;
+        if(element < n * n && threadID < BLOCK_SIZE * BLOCK_SIZE){
+            As[threadID] = a[element];
+        }
     }
 }
 
@@ -124,10 +127,15 @@ __device__ void loadBlockToShared(const T *a, T *As, int r, int c, int n){
 */
 template <typename T>
 __device__ void clearBlockToShared(T *a, int BS = BLOCK_SIZE){
-    int threadID = threadIdx.x;
-    
-    if(threadID < BS * BS){
-        a[threadID] = 0;
+    int iteration = (BS * BS) / THREADS_PER_BLOCK;
+
+    for (int i = 0; i < iteration; ++i){
+        
+        int threadID = threadIdx.x + i * THREADS_PER_BLOCK;
+        
+        if(threadID < BS * BS){
+            a[threadID] = 0;
+        }
     }
 }
 
@@ -142,14 +150,17 @@ __device__ void clearBlockToShared(T *a, int BS = BLOCK_SIZE){
 */
 template <typename T>
 __device__ void copyBlockToGlobal(const T *As, T *a, int r, int c, int n){
-    int threadID = threadIdx.x;
-    int colInsideBlock = threadID % BLOCK_SIZE;
-    int rowInsideBlock = threadID / BLOCK_SIZE * n;
-    int blockColOffset = c * BLOCK_SIZE;
-    int blockRowOffset = r * BLOCK_SIZE * n;
-    int element = colInsideBlock + blockColOffset + rowInsideBlock + blockRowOffset;
-    if(element < n * n){
-        a[element] = As[threadID];
+    int iteration = (BLOCK_SIZE * BLOCK_SIZE) / THREADS_PER_BLOCK;
+    for (int i = 0; i < iteration; ++i){
+        int threadID = threadIdx.x + i * THREADS_PER_BLOCK;
+        int colInsideBlock = threadID % BLOCK_SIZE;
+        int rowInsideBlock = threadID / BLOCK_SIZE * n;
+        int blockColOffset = c * BLOCK_SIZE;
+        int blockRowOffset = r * BLOCK_SIZE * n;
+        int element = colInsideBlock + blockColOffset + rowInsideBlock + blockRowOffset;
+        if(element < n * n && threadID < BLOCK_SIZE * BLOCK_SIZE){
+            a[element] = As[threadID];
+        }
     }
 }
 

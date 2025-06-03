@@ -228,7 +228,13 @@ __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *d_
             blockMatrixMul(As, Bs, Cs, BLOCK_SIZE);
             __syncthreads();    // Attendi i thread dei primi 8 warp per completare la computazione
 
-            Acc[threadIdx.x] = Acc[threadIdx.x] + Cs[threadIdx.x] + Cs[threadIdx.x + blockSize];
+            int iterations = (BLOCK_SIZE * BLOCK_SIZE) / THREADS_PER_BLOCK;
+            for(int i = 0; i < iterations; i++){
+                int threadID = threadIdx.x + i * THREADS_PER_BLOCK;
+                Acc[threadID] = Acc[threadID] + Cs[threadID] + Cs[threadID + blockSize];
+                __syncthreads();    // Attendi il completamento della somma
+            }
+                
             __syncthreads();    // Attendi il completamento della somma
             
             clearBlockToShared(Cs);
@@ -287,7 +293,7 @@ void tensorCoreMatMul(const half *d_A, const half *d_B, float *d_C, int n, float
     }
 
     // Configura la griglia e i blocchi per la computazione
-    dim3 threadsPerBlock(THREADS_PER_BLOCK * THREADS_PER_BLOCK);
+    dim3 threadsPerBlock(THREADS_PER_BLOCK);
     dim3 numBlocks(n / BLOCK_SIZE, n / BLOCK_SIZE);
 
     // Misurazione del tempo

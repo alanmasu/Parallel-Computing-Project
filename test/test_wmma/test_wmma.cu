@@ -45,7 +45,14 @@ __global__ void testBlockMatrixMul(half* a, half* b, float* d_c, int n){
     __syncthreads();
 
     //Somma i risultati parziali nella matrice in global memory
-    d_c[threadIdx.x] = Cs[threadIdx.x] + Cs[threadIdx.x + BLOCK_SIZE * BLOCK_SIZE];
+    int iterations = (BLOCK_SIZE * BLOCK_SIZE) / THREADS_PER_BLOCK;
+    for(int i = 0; i < iterations; i++){
+        int threadID = threadIdx.x + i * THREADS_PER_BLOCK;
+        if(threadID < BLOCK_SIZE * BLOCK_SIZE){
+            d_c[threadID] = Cs[threadID] + Cs[threadID + BLOCK_SIZE * BLOCK_SIZE];
+        }
+    }
+        
 
     // blockMatrixMul(a, b, d_c, n);
     // copyBlockToGlobal(Cs, d_c, blockIdx.y, blockIdx.x, n);
@@ -89,9 +96,11 @@ int main(int argc, char **argv){
     // Inizializza le matrici A e B sull'host
     if(h_A != NULL && h_B != NULL && h_C_wmma != NULL && h_C_cublas != NULL){
         printf("[INFO]: Inizializzazione delle matrici sull'host\n");
-        for (int i = 0; i < N * N; ++i) {
-            h_A[i] = i;
-            h_B[i] = i;
+       for (int row = 0; row < N; ++row){
+            for(int col = 0; col < N; ++col){
+                h_A[row * N + col] = row == col ? 1 : 0;
+                h_B[row * N + col] = (row * N + col) / 1000.0;
+            }
         }
         memset(h_C_wmma, 0, matrix_size);
         memset(h_C_cublas, 0, matrix_size);
@@ -182,7 +191,7 @@ int main(int argc, char **argv){
     // Moltiplicazione di matrici con kernel custom
 
     dim3 blocks = dim3(N/BLOCK_SIZE, N/BLOCK_SIZE);
-    dim3 threads = dim3(THREADS_PER_BLOCK * THREADS_PER_BLOCK);
+    dim3 threads = dim3(THREADS_PER_BLOCK);
     testBlockMatrixMul<<<blocks, threads>>>(d_A_h, d_B_h, d_C, N);
 
     // Copia dei risultati dalla GPU all'host
@@ -208,7 +217,7 @@ int main(int argc, char **argv){
     //Testing dei risultati e confronto con cuBLAS
     bool success = true;
     for(int i = 0; i < N * N; i++){
-        if(h_C_cublas[i] - h_C_wmma[i] > 0.2){
+        if(__half2float(h_A_h[i]) != (h_C_wmma[i])){
             printf("\n\n[ERRORE]: i risultati non coincidono\n");
             printf("h_C_cublas[%d] != h_C_wmma[%d]\n", i, i);
             printf("%f != %f\n", h_C_cublas[i], h_C_wmma[i]);

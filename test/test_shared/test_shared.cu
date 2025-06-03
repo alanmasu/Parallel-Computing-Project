@@ -83,7 +83,8 @@ int testShared(){
 
     //Calling the kernel
     dim3 blocks(2,2);
-    testSharedMemoryFunctions<<<blocks, 1024>>>(testDevice, destinationDevice, size);
+    dim3 threads(THREADS_PER_BLOCK);
+    testSharedMemoryFunctions<<<blocks, threads>>>(testDevice, destinationDevice, size);
 
     cudaDeviceSynchronize();
 
