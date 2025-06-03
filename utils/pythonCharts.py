@@ -53,11 +53,19 @@ def createFlopsChart(filename, img_filename):
         
     plt.xticks(ticks, ticks_labels)
     plt.legend()
-    plt.savefig(img_filename + '.png')
+    if img_filename.endswith(".pdf"):
+        plt.savefig(img_filename, format="pdf")
+    else
+        plt.savefig(img_filename + '.png')
     # plt.show()
 
     plt.yscale('log')
-    plt.savefig(img_filename + '-log.png')
+    if img_filename.endswith(".pdf"):
+        #remove the .pdf extension to avoid duplication
+        img_filename = img_filename[:-4]
+        plt.savefig(img_filename + '-log.pdf', format="pdf")
+    else:
+        plt.savefig(img_filename + '-log.png')
     return 1
 
 # Main
