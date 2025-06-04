@@ -43,6 +43,10 @@ void populateBlockOfMatrix(float *A, int bRow, int bCol, int bs, int size){
     }
 }
 
+/**
+    @brief Funzione per testare la popolazione di un blocco di matrice
+    @details Questa funzione popola un blocco e stampa le prime due righe e colonne
+ */
 int testPopulateBlockOfMatrix(){
     float a[2*2] = {-1.0};
     // const float test[2*2] = {10.0, 11.0, 14.0, 15.0};
@@ -59,6 +63,11 @@ int testPopulateBlockOfMatrix(){
     return 0;
 }
 
+/**
+    @brief Funzione per testare la moltiplicazione di matrici a blocchi
+    @details Questa funzione esegue la moltiplicazione di matrici a blocchi e confronta i risultati con quelli ottenuti da cuBLAS
+    @return 0 se il test è passato, -1 se c'è un errore nei risultati, 1 se c'è un errore nell'allocazione delle matrici sull'host, 2 se c'è un errore nella copia delle matrici sulla GPU, 3 se c'è un errore nella conversione in half
+*/
 int testBlockMatrixMultiplication(){
     const int SIZE_COUNT = 4;
     int sizes[SIZE_COUNT] = {32, 64, 256, 2048};
@@ -205,6 +214,10 @@ int testBlockMatrixMultiplication(){
     return 0;
 }
 
+
+/**
+    @brief Funzione principale per eseguire i test di moltiplicazione di matrici a blocchi
+*/
 int main(int argc, char **argv){
     int res = 0;
     printf("\n--------- TESTING BATCHED ---------\n");
@@ -225,71 +238,3 @@ int main(int argc, char **argv){
     return 0;
 
 }
-
-
-// // Inizializza le matrici A e B sull'host
-// if(h_A != NULL && h_B != NULL && h_C_wmma != NULL){
-//     printf("[INFO]: Inizializzazione delle matrici sull'host\n");
-//     for (int i = 0; i < N; ++i) {
-//         for(int j = 0; j < N; ++j){
-//             // h_A[i] = 0.1;
-//             // h_B[i] = 0.2;                // Blocco [r,c]
-//             if(i < 32  && j < 32){          // Blocco [0,0] [ERROR]
-//                 h_A[i + j * N] = i + j * N;
-//                 h_B[i + j * N] = i + j * N;
-//             }else if(i >= 32 && j < 32){    // Blocco [0,1] [OK]
-//                 h_A[i + j * N] = 0;
-//                 h_B[i + j * N] = 0;
-//             }else if(i < 32 && j >= 32){    // Blocco [1,0] [ERROR]
-//                 h_A[i + j * N] = 0;
-//                 h_B[i + j * N] = 0;
-//             }else{                          // Blocco [1,1] [OK]
-//                 h_A[i + j * N] = 0;
-//                 h_B[i + j * N] = 0;
-//             }
-//         }
-//     }
-//     printf("A[0,1]: %f\nA[0,32]: %f\nA[32,0]: %f\nA[32,32]: %f\n\n", h_A[1], h_A[32], h_A[32 * N], h_A[32 * N + 32]);
-//     memset(h_C_wmma, 0, matrix_size);
-// }else{
-//     printf("[ERR]:Errore nell'allocazione delle matrici sull'host\n");
-//     return 1;
-// }
-
-
-// // Copia delle matrici dall'host alla GPU
-// if(err1 == cudaSuccess && err2 == cudaSuccess && err3 == cudaSuccess){
-//     printf("\n[INFO]: Copia delle matrici sulla GPU\n");
-//     checkCudaError(cudaMemcpy(d_A, h_A, matrix_size, cudaMemcpyHostToDevice), "Copia matrice A sulla GPU");
-//     checkCudaError(cudaMemcpy(d_B, h_B, matrix_size, cudaMemcpyHostToDevice), "Copia matrice B sulla GPU");
-//     checkCudaError(cudaMemcpy(d_C, h_C_wmma, matrix_size, cudaMemcpyHostToDevice), "Copia matrice C sulla GPU");
-//     printf("[INFO]: Matrici copiate sulla GPU\n");
-// }else{
-//     printf("[ERR]: Errore nell'allocazione delle matrici sulla GPU\n");
-//     return 2;
-//     }
-
-
-// //Indicatori di performance
-// float cublasMillis = 0;
-// double cublasTFLOPS = 0;
-
-// ///////////////////// ALGORHITMs ///////////////////////
-// /////// cuBLAS ///////
-// // Moltiplicazione di matrici con cuBLAS
-// cublasMatMul(d_A, d_B, d_C, N,&cublasMillis, &cublasTFLOPS); 
-// // Copia dei risultati dalla GPU all'host
-// checkCudaError(cudaMemcpy(h_C_cublas, d_C, matrix_size, cudaMemcpyDeviceToHost), "Copia matrice C dall'host");
-// //Stampa delle matrici
-// if(N <= 4){
-//     printf("Matrice A:\n");
-//     printMat(h_A, N, N);
-//     printf("Matrice B:\n");
-//     printMat(h_B, N, N);
-//     printf("Matrice C:\n");
-//     printMat(h_C_cublas, N, N);
-// }
-
-// // Stampa dei risultati
-// printf("\nTempo di esecuzione [cuBLAS] [size: %d]: %f ms\n", cublasMillis, N);
-// printf("TFLOPS [cuBLAS] [size: %d]: %f\n\n", cublasTFLOPS, N);

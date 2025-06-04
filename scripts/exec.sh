@@ -1,1 +1,1 @@
-srun --partition=edu5 --nodes=1 --tasks=1 --gres=gpu:1 --cpus-per-task=1 --time=00:05:00 $1
+srun --partition=edu-medium --nodes=1 --tasks=1 --gres=gpu:a30.24:1 --cpus-per-task=1 --time=00:10:00 $1

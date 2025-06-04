@@ -1,4 +1,4 @@
-/**!
+/**
     @file   test_shared.cu
     @brief  Test load and store from global to shared memory and viceversa
 
@@ -15,8 +15,8 @@
 
 #warning "TESTING SHARED MEMORY"
 
-/**!
-    @brief      Function to perform a multiplication between two block of matrices using shared memory
+/**
+    @brief      Kernel to test parallel load-store to and from shared memory.
     @details    This function tests the shared memory functions by copying the source matrix to the destination matrix
                 using shared memory
 */
@@ -29,6 +29,12 @@ __global__ void testSharedMemoryFunctions(float* source, float* destination, int
 }
 
 
+/**
+    @brief      Function to test shared memory operations.
+    @details    This function allocates memory on the host and device, initializes the source matrix,
+                copies it to the device, calls the kernel to perform operations using shared memory,
+                and finally checks if the results are correct by comparing the destination matrix with the source matrix.
+*/
 int testShared(){
     printf("\n--------- TESTING SHARED MEMORY ---------\n");
 
@@ -127,6 +133,10 @@ int testShared(){
     return 0;
 }
 
+/**
+    @brief      Main function to run the shared memory test.
+    @details    This function calls the testShared function and prints the result of the test.
+*/
 int main(int argc, char **argv){
     int res = 0;
     res = testShared();
