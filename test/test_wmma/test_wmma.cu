@@ -1,4 +1,4 @@
-/*!
+/**
     @file test_wmma.cu
 
     @brief Test the __device__ function for block multiplication using WMMA
@@ -16,9 +16,10 @@
 
 #warning "TEST WMMA"
 
+/// @brief Dimensione del blocco di matrice per la moltiplicazione
 #define N 32
 
-/**!
+/**
     @brief Kernel che chiama la funzione 'blockMatrixMul' per moltiplicare due blocchi BLOCK_SIZE x BLOCK_SIZE
 
     @param a puntatore alla matrice A sul device
@@ -69,6 +70,9 @@ __global__ void testBlockMatrixMul(half* a, half* b, float* d_c, int n){
     }
 }
 
+/**
+    @brief Funzione principale che esegue il test della moltiplicazione di matrici con WMMA
+*/
 int main(int argc, char **argv){
     // Puntatori per le matrici sull'host
     float *h_A = NULL;

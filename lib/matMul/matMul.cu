@@ -1,6 +1,6 @@
-/**!
+/**
     @file matMul.cu
-    @author Alan Masutti (@alanmasu)
+    @author Alan Masutti (@alanmasu on GitHub)
 
     @brief Implementation of matrix multiplication using CUDA and cuBLAS.
     @details This file contains the implementation of matrix multiplication using CUDA Cores and Tensor Cores.
@@ -32,7 +32,7 @@ void serialMatMul(const float *A, const float *B, float *C, int N){
     }
 }
 
-/*!
+/**
     @brief Function to print a matrix of type half
     @details This function is a specialized version for printing matrices of type half.
              It converts each element to float correct printing them to console.
@@ -123,7 +123,7 @@ void cublasMatMul(const float *d_A, const float *d_B, float *d_C, int n, float* 
 
 
 #ifndef WMMA_BATCHED
-    /**!
+    /**
         @brief Funzione per la moltiplicazione di matrici con Cuda Cores a blocchi di BLOCK_SIZE x BLOCK_SIZE
     */
     __global__ void matrixMultiplyTensorCore(const half *a, const half *b, float *c, int M) {
@@ -193,7 +193,7 @@ __device__ void blockMatrixMul(const half *a, const half *b, float *c, int n){
     }
 }
 
-/*!
+/**
     @brief      Kernel to compute GEMM using Tensor Cores and WMMA
     @details    The kernel computes the matrix multiplication using Tensor Cores and WMMA.
                 It uses shared memory to load the blocks of matrices A and B, and computes the

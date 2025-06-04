@@ -1,4 +1,10 @@
-//Simple Matrix Multiplication whit cuBLAS
+/**
+    @file main.cu
+    @brief Main file for the Tiled Matrix Multiplication project.
+    @details This file contains the main function that initializes the matrices, performs matrix multiplication using cuBLAS and a custom kernel, and saves the performance results to a CSV file. 
+
+    @author Alan Masutti (@alanmasu on GitHub)
+ */
 
 #include <stdio.h>
 #include <cuda_runtime.h>
@@ -8,17 +14,22 @@
 #include <Utilities.h>
 
 #ifndef N_RUNS
+    /// @brief Number of runs for each matrix size. May be defined in the Makefile.
     #define N_RUNS 3
 #else 
     #warning "N_RUNS already defined, using the value defined in the Makefile"
 #endif
 
 #ifndef SIZE_END
+    /// @brief Maximum size of the matrices to be multiplied. May be defined in the Makefile.
     #define SIZE_END 16384
 #else
     #warning "SIZE_END already defined, using the value defined in the Makefile"
 #endif
 
+/**
+    @brief Main function that initializes matrices, performs matrix multiplication, and saves results.
+*/
 int main(int argc, char **argv) {
     // Recupero dell'ora corrente per la creazione del file di output
     time_t curr_time;
